@@ -7,6 +7,12 @@ class Client:
         self.partner = self.get_partner()
         self.partnet = None # TODO: tcp socket to server?
 
+
+    # listen-print-eval-loop
+    def listen(self):
+        raise NotImplementedError
+
+
     # generate pair of keys for this client
     def generate_key(self, count):
         raise NotImplementedError

@@ -13,8 +13,8 @@ class Packet:
         
         self.terminal = terminal            
         self.collect = None
-        self.message = None
         self.drop = None
+        self.message = None
 
     # takes decrypted value as inclear json and fill instance with its values
     # discards any extraneous values
@@ -25,8 +25,8 @@ class Packet:
             raise ValueError("no decrypted value")
 
         self.collect = self.packet.get("collect")
-        self.message = self.packet.get("message")
         self.drop = self.packet.get("drop")
+        self.message = self.packet.get("message")
 
     # use key to store a decrypted version
     def decrypt(self, key):

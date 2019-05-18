@@ -23,9 +23,9 @@ def post_submission(id):
     collect, message, drop = recieved.get("collect"), recieved.get("message"), recieved.get("drop")
     if not (collect and message and drop):
         results = {
-            "collect": collect,
-            "message": message,
-            "drop": drop,
+            "collect": collect, # key for requested deaddrop access
+            "drop": drop, # key for requested deaddrop deposit
+            "message": message, # message to be deposited
         }
         return jsonify("Incomplete submission", results), HTTPStatus.BAD_REQUEST
 

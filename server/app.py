@@ -22,6 +22,8 @@ chain_keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
 # holds the seed used to shuffle  
 reorder = None
 
+current_round = 0
+
 @app.route("/")
 def hello():
     return "Hello from the server!"
@@ -37,7 +39,11 @@ def post_submission(id):
         return f"Incomplete submission: {e}", HTTPStatus.BAD_REQUEST
     
     round_packets[id] = packet
-    process(packet)
+    make_drop(packet)
+
+    advance_round()
+
+    return redirect(f"/deaddrop/{id}")
 
     # # TODO: add validation to each
     # collect, message, drop = recieved.get("collect"), recieved.get("message"), recieved.get("drop")
@@ -49,16 +55,21 @@ def post_submission(id):
     #     }
     #     return jsonify("Incomplete submission", results), HTTPStatus.BAD_REQUEST
 
-    return redirect(f"/deaddrop/{id}")
-
-def process(packet):
+# processes the passed cleartext packet: stores its contained message with the
+# appropriate key in the deaddrop space
+def make_drop(packet):
     deaddrops[packet.drop] = packet.message
+
+# given an id, services its requested drop
+def collect_drop():
+    deaddrops.get(round_packets[id].collect)
 
 @app.route('/deaddrop/<int:id>', methods=['GET'])
 def get_round(id):
     assert(id in round_packets)
     response = { 
-        "collected": deaddrops.get(round_packets[id].collect)
+        "round": current_round,
+        "collected": collect_drop(id)
     }
 
     return jsonify(response)

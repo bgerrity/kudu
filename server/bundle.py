@@ -14,23 +14,23 @@ class Bundle:
     def add_packet(self, packet):
         self.packets.append(packet)
 
-    def prep_forward(self, key):
+    # preps for passing up chain
+    def prep_up(self, key):
         self.decrypt_packets(key)
         self.forward_shuffle_packets()
 
-    def prep_reverse(self, key):
+    # preps for passing back down chain
+    def prep_down(self, key):
         self.decrypt_packets(key)
         self.reverse_shuffle_packets()
 
     def encrypt_packets(self, key):
         for p in self.packets:
             p.encrypt(key)
-        raise NotImplementedError("Bundle.encrypt_packets")
 
     def decrypt_packets(self, key):
         for p in self.packets:
             p.decrypt(key)
-        raise NotImplementedError("Bundle.decrypt_packets")
 
     # shuffles the bundled packets using an optionally provided key
     # returns shuffle map (list of original indices)

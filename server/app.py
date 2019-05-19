@@ -29,11 +29,12 @@ def hello():
 @app.route('/submission/<int:id>', methods=['POST'])
 def post_submission(id):
     packet = Packet(request.get_json(), True)
-    
+    packet.decrypt("foo")
+
     try:
         packet.unwrap()
-    except ValueError:
-        return "Incomplete submission", HTTPStatus.BAD_REQUEST
+    except ValueError as e:
+        return f"Incomplete submission: {e}", HTTPStatus.BAD_REQUEST
     
     round_packets[id] = packet
     process(packet)

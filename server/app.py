@@ -17,7 +17,7 @@ clients = {} # TODO: fill via http query to dispatch
 
 # holds the tuples of the server chain crypt keys (public, private)
 # ordered from origin to deaddrop (TODO: bettter phrasing?)
-keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
+chain_keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
 
 # holds the seed used to shuffle  
 reorder = None
@@ -29,9 +29,12 @@ def hello():
 @app.route('/submission/<int:id>', methods=['POST'])
 def post_submission(id):
     packet = Packet(request.get_json(), True)
-
-    packet.decrypt("foo")
-    packet.unwrap()
+    
+    try:
+        packet.unwrap()
+    except ValueError:
+        return "Incomplete submission", HTTPStatus.BAD_REQUEST
+    
     round_packets[id] = packet
     process(packet)
 

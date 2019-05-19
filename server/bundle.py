@@ -3,7 +3,7 @@
 import random
 
 # A representation of inter-server communication: Namely, the list of operable
-# requests to be fulfilled for a client.
+# requests to be fulfilled for a client (a bundle of packets).
 # Includes facilites for core Vuvuzela operations:
 # Encryption, decryption, shuffle, and unshuffle.
 class Bundle:

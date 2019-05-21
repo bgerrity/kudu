@@ -57,16 +57,6 @@ def get_current_round():
         round = db.current_round
     return f"{round}", HTTPStatus.OK
 
-
-# processes the passed cleartext packet: stores its contained message with the
-# appropriate key in the deaddrop space
-# def make_drop(packet):
-#     deaddrops[packet.drop] = packet.message
-
-# given an id, services its requested drop
-def collect_drop(id):
-        return db.return_request(id)
-
 @app.route('/deaddrop/<int:id>', methods=['GET'])
 def get_response(id):
     try:
@@ -80,9 +70,10 @@ def get_response(id):
 
     return jsonify(response)
 
-# if the current round is complete 
-def all_recieved():
-    raise NotImplementedError()
+    # given an id, services its requested drop
+def collect_drop(id):
+        return db.return_request(id)
+
 
 if __name__ == '__main__':
     port = 5001

@@ -8,6 +8,8 @@ See [here](https://dl.acm.org/citation.cfm?id=2815417) for details.
 
 ## Installation
 
+See Flask [docs](http://flask.pocoo.org/docs/1.0/installation/) for setup info.
+
 Run `pip install -r requirements.txt` to install dependencies.
 
 The use of a [virtual environment](https://docs.python.org/3/library/venv.html) and Python 3.7 or later is recommended.

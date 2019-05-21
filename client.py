@@ -1,4 +1,9 @@
-# Vuvuzela client
+#! /usr/bin/env python3
+
+message = ""
+while message != "Quit":
+    message = input("Enter message: ")
+
 
 class Client:
     def __init__(self, ETC): # TODO: args
@@ -24,12 +29,12 @@ class Client:
     # query user for message to send
     def collect_message(self):
         raise NotImplementedError
-    
+
     # instantiate round struct
     def create_round(self):
         raise NotImplementedError
 
-    # instantiate noise message 
+    # instantiate noise message
     def create_round_noise(self):
         raise NotImplementedError
 
@@ -47,5 +52,3 @@ class Client:
 
     def decrypt(self):
         raise NotImplementedError
-
-

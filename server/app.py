@@ -19,7 +19,7 @@ clients = {} # TODO: fill via http query to dispatch
 # ordered from origin to deaddrop (TODO: bettter phrasing?)
 chain_keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
 
-# holds the seed used to shuffle  
+# holds the seed used to shuffle
 reorder = None
 
 current_round = 0
@@ -37,7 +37,7 @@ def post_submission(id):
         packet.unwrap()
     except ValueError as e:
         return f"Incomplete submission: {e}", HTTPStatus.BAD_REQUEST
-    
+
     round_packets[id] = packet
     make_drop(packet)
 
@@ -53,7 +53,7 @@ def post_submission(id):
     #         "drop": drop, # key for requested deaddrop deposit
     #         "message": message, # message to be deposited
     #     }
-    #     return jsonify("Incomplete submission", results), HTTPStatus.BAD_REQUEST
+        #     return jsonify("Incomplete submission", results), HTTPStatus.BAD_REQUEST
 
 # processes the passed cleartext packet: stores its contained message with the
 # appropriate key in the deaddrop space
@@ -67,14 +67,14 @@ def collect_drop():
 @app.route('/deaddrop/<int:id>', methods=['GET'])
 def get_round(id):
     assert(id in round_packets)
-    response = { 
+    response = {
         "round": current_round,
         "collected": collect_drop(id)
     }
 
     return jsonify(response)
 
-# if the current round is complete 
+# if the current round is complete
 def all_recieved():
     raise NotImplementedError()
 

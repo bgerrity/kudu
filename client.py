@@ -1,12 +1,12 @@
 #! /usr/bin/env python3
 
-message = ""
-while message != "Quit":
-    message = input("Enter message: ")
+from Cryptodome.Cipher import AES, PKCS1_OAEP
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Random import get_random_bytes
 
 
 class Client:
-    def __init__(self, ETC): # TODO: args
+    def __init__(self): # TODO: args
         self.id = None
         self.key = self.generate_key(1) # [ ( public, secret ) ]
         self.partner = self.get_partner()
@@ -52,3 +52,9 @@ class Client:
 
     def decrypt(self):
         raise NotImplementedError
+
+
+message = ""
+#client = Client()
+while message != "Quit":
+    message = input("Enter message: ")

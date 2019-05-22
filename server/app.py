@@ -32,23 +32,13 @@ def hello():
 @app.route('/submission/<int:id>', methods=['POST'])
 def post_submission(id):
     packet = Packet(request.get_json(), terminal=True)
-    packet.decrypt("foo")
 
     with server_lock:
-        if db.receive_mode:
+        if db.mode == db.Modes.RECEIVING:
             db.collect_request(id, packet)
         else:
-            return f"Server not recieving", HTTPStatus.BAD_REQUEST
+            return f"Server not receiving", HTTPStatus.BAD_REQUEST
 
-    # try:
-    #     packet.unwrap()
-    # except ValueError as e:
-    #     return f"Incomplete submission: {e}", HTTPStatus.BAD_REQUEST
-    
-    # db.packets[id] = packet
-    # make_drop(packet)
-
-    # return redirect(f"/deaddrop/{id}")
     return f"Received POST from {id}", HTTPStatus.ACCEPTED
 
 @app.route('/current_round', methods=['GET'])
@@ -59,20 +49,23 @@ def get_current_round():
 
 @app.route('/deaddrop/<int:id>', methods=['GET'])
 def get_response(id):
-    try:
-        with server_lock:
-            response = { 
-                "round": db.current_round,
-                "collected": collect_drop(id)
-            }
-    except ValueError:
-        return f"Server not distributing", HTTPStatus.BAD_REQUEST
+    with server_lock:
+        if db.mode == db.Modes.DISTRIBUTING:
+            collected = collect_drop(id)
+        else:
+            return f"Server not distributing", HTTPStatus.BAD_REQUEST
+
+        response = {
+            "round": db.current_round,
+            "collected": collected
+        }
 
     return jsonify(response)
 
-    # given an id, services its requested drop
+# given an id, services its requested drop
+# assumes server lock is owned by thread
 def collect_drop(id):
-        return db.return_request(id)
+    return db.return_request(id)
 
 
 if __name__ == '__main__':

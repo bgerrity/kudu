@@ -6,7 +6,10 @@
 
 import json
 from collections import namedtuple
-from enum import Enum 
+from enum import Enum
+
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
 # from bundle import Bundle
 from packet import Packet
@@ -14,64 +17,63 @@ from packet import Packet
 Key_Pair = namedtuple("keys", ["public", "private"])
 
 class Server:
-    class States(Enum):
-        RECEIVING = 1 
+    class Modes(Enum):
+        RECEIVING = 1
         PROCESSING = 2
         DISTRIBUTING = 3
 
     def __init__(self, client_count=0):
-        self.current_round = -1
-        # self.bundle = None
         self.client_count = client_count
-        self.key_pair = Key_Pair("foo", "bar")
-
-        self.state = Server.States.RECEIVING
+        self.key_pair = Server.gen_key_pair()
 
         self.current_round = 0
+        self.mode = Server.Modes.RECEIVING
+
         self.deaddrops = {}
         self.packets = {}
 
-    # # TODO: implement
-    # # indicates if server is in recieve mode
-    # def accepting_requests(self):
-    #     return self.receive_mode        
+    @staticmethod
+    def gen_key_pair():
+        with open("fixed-key.pem", "rb") as f:
+            server_key = RSA.import_key(f.read())
+
+        # server_key = RSA.generate(2048)
+        return Key_Pair(server_key.export_key(), server_key.publickey().export_key())
 
     def reset(self):
-        self.receive_mode = True
-        self.distribute_mode = False
-
         self.current_round += 1
         self.deaddrops = {}
         self.packets = {}
 
+    # handles
     def collect_request(self, id, packet):
-        if self.state != Server.States.RECEIVING:
+        if self.mode != Server.Modes.RECEIVING:
             raise ValueError("not ready to receive")
 
         self.packets[id] = packet
 
         # if all expected are received, process them in
         if len(self.packets.keys()) == self.client_count:
-            self.state = Server.States.PROCESSING
+            self.mode = Server.Modes.PROCESSING
             self.process_requests()
-        
-    
+
+
     def process_requests(self):
-        if self.state != Server.States.PROCESSING:
+        if self.mode != Server.Modes.PROCESSING:
             raise ValueError("not ready to process")
 
         # process drops in
-        for id, packet in self.packets.items():
-            packet.decrypt_and_process("bar")
+        for _, packet in self.packets.items():
+            packet.decrypt_and_process(Key_Pair.private)
             self.deaddrops[packet.contents.drop] = packet.contents.message
         # finished processing
 
     def return_request(self, id):
-        if self.state != Server.States.DISTRIBUTING:
+        if self.mode != Server.Modes.DISTRIBUTING:
             raise ValueError("not ready to distribute")
         elif id not in self.packets:
             raise ValueError("no such id was recieved")
-        
+
         requested_drop = self.packets[id].contents.collect
         result = self.deaddrops.pop(requested_drop)
 
@@ -80,7 +82,3 @@ class Server:
             self.reset()
 
         return result
-
-
-
-

@@ -15,23 +15,50 @@ from flask import Flask, Response, request, redirect, jsonify
 import subprocess
 import time
 import sys
+from http import HTTPStatus
+from threading import Lock
 
 # launch the server and a clients
 
-app = Flask(__name__)
 
 class Dispatch:
-    None
-    # TODO: define const table
-    # message size
-    # deadrop slot count (and ranges)
-    # deadrop index format
-    # padding rules
+    def __init__(self):
+        self.num_clients = 0
+        # dictionary that will hold all public keys
+        self.public_keys = {}
 
+app = Flask(__name__)
+keys = Dispatch()
+server_lock = Lock() # general purpose lock
+
+
+# dispatch server port
 @app.route("/dispatch_port", methods=['GET'])
 def get_port():
-    return 5000
+    return f"5000", HTTPStatus.ACCEPTED
 
+# vuvuzela server port
+@app.route("/server_port", methods=['GET'])
+def get_servr_port():
+    return f"5001", HTTPStatus.ACCEPTED
+
+# id will be the id that a client will hold
+# so when making a call to this the client will give it's id and public key
+@app.route("/publish_key/<int:id>/<string:key>", methods=['POST'])
+def publish_key(id, key):
+    with server_lock:
+        keys.public_keys[id] = key
+
+    return f"Received key from {id}", HTTPStatus.ACCEPTED
+
+@app.route("/get_key/<int:id>", methods=['GET'])
+def get_key(id):
+    try:
+        partner_key = keys.public_keys[id]
+    except KeyError:
+        return f"No_Key", HTTPStatus.BAD_REQUEST
+
+    return f"{partner_key}", HTTPStatus.ACCEPTED
 
 if __name__ == '__main__':
     port = 5000

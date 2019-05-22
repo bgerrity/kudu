@@ -31,7 +31,7 @@ def hello():
 # stores uploaded packet
 @app.route('/submission/<int:id>', methods=['POST'])
 def post_submission(id):
-    packet = Packet(request.get_json(), terminal=True)
+    packet = Packet(request.data, terminal=True)
 
     with server_lock:
         if db.mode == db.Modes.RECEIVING:
@@ -50,15 +50,19 @@ def get_current_round():
 @app.route('/deaddrop/<int:id>', methods=['GET'])
 def get_response(id):
     with server_lock:
-        if db.mode == db.Modes.DISTRIBUTING:
-            collected = collect_drop(id)
-        else:
-            return f"Server not distributing", HTTPStatus.BAD_REQUEST
+        if db.mode != db.Modes.DISTRIBUTING:
+            return "Server not distributing", HTTPStatus.BAD_REQUEST
+        elif id not in db.packets:
+            return f"No request by id:{id}", HTTPStatus.BAD_REQUEST
 
-        response = {
-            "round": db.current_round,
-            "collected": collected
-        }
+        try:
+            response = {
+                "round": db.current_round,
+                "collected": collect_drop(id)
+            }
+        except KeyError:
+            return f"Already returned id:{id}", HTTPStatus.BAD_REQUEST
+
 
     return jsonify(response)
 
@@ -66,7 +70,6 @@ def get_response(id):
 # assumes server lock is owned by thread
 def collect_drop(id):
     return db.return_request(id)
-
 
 if __name__ == '__main__':
     port = 5001

@@ -3,85 +3,85 @@
 # app.py
 
 from flask import Flask, Response, request, redirect, jsonify
+
+from sys import argv
 from http import HTTPStatus
-import sys
+from collections import deque
+from threading import Lock
+
+from server import Server # hacky.db interface
 from packet import Packet
 
 app = Flask(__name__)
 
-# hacky.db
-round_packets = {} # (id: request)
-deaddrops = {}
+dispatch_port = None
 
-clients = {} # TODO: fill via http query to dispatch
+server_lock = Lock() # general purpose lock
+
+db = Server(2)
 
 # holds the tuples of the server chain crypt keys (public, private)
 # ordered from origin to deaddrop (TODO: bettter phrasing?)
 chain_keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
 
-# holds the seed used to shuffle
-reorder = None
-
-current_round = 0
-
 @app.route("/")
 def hello():
     return "Hello from the server!"
 
+# stores uploaded packet
 @app.route('/submission/<int:id>', methods=['POST'])
 def post_submission(id):
-    packet = Packet(request.get_json(), True)
-    packet.decrypt("foo")
+    packet = Packet(request.data, terminal=True)
 
-    try:
-        packet.unwrap()
-    except ValueError as e:
-        return f"Incomplete submission: {e}", HTTPStatus.BAD_REQUEST
+    with server_lock:
+        if db.mode == db.Modes.RECEIVING:
+            db.collect_request(id, packet)
+        else:
+            return f"Server not receiving", HTTPStatus.BAD_REQUEST
 
-    round_packets[id] = packet
-    make_drop(packet)
+    return f"Received POST from {id}", HTTPStatus.ACCEPTED
 
-    advance_round()
-
-    return redirect(f"/deaddrop/{id}")
-
-    # # TODO: add validation to each
-    # collect, message, drop = recieved.get("collect"), recieved.get("message"), recieved.get("drop")
-    # if not (collect and message and drop):
-    #     results = {
-    #         "collect": collect, # key for requested deaddrop access
-    #         "drop": drop, # key for requested deaddrop deposit
-    #         "message": message, # message to be deposited
-    #     }
-        #     return jsonify("Incomplete submission", results), HTTPStatus.BAD_REQUEST
-
-# processes the passed cleartext packet: stores its contained message with the
-# appropriate key in the deaddrop space
-def make_drop(packet):
-    deaddrops[packet.drop] = packet.message
-
-# given an id, services its requested drop
-def collect_drop():
-    deaddrops.get(round_packets[id].collect)
+@app.route('/current_round', methods=['GET'])
+def get_current_round():
+    with server_lock:
+        round = db.current_round
+    return f"{round}", HTTPStatus.OK
 
 @app.route('/deaddrop/<int:id>', methods=['GET'])
-def get_round(id):
-    assert(id in round_packets)
-    response = {
-        "round": current_round,
-        "collected": collect_drop(id)
-    }
+def get_response(id):
+    with server_lock:
+        if db.mode != db.Modes.DISTRIBUTING:
+            return "Server not distributing", HTTPStatus.BAD_REQUEST
+        elif id not in db.packets:
+            return f"No request by id:{id}", HTTPStatus.BAD_REQUEST
+
+        try:
+            response = {
+                "round": db.current_round,
+                "collected": collect_drop(id)
+            }
+        except KeyError:
+            return f"Already returned id:{id}", HTTPStatus.BAD_REQUEST
+
 
     return jsonify(response)
 
-# if the current round is complete
-def all_recieved():
-    raise NotImplementedError()
+# given an id, services its requested drop
+# assumes server lock is owned by thread
+def collect_drop(id):
+    return db.return_request(id)
 
 if __name__ == '__main__':
     port = 5001
+    dispatch_port = 5000
+
     try:
-        port = int(sys.argv[1])
+        port = int(argv[1])
     except (ValueError, IndexError):
         pass
+    try:
+        dispatch_port = int(argv[2])
+    except (ValueError, IndexError):
+        pass
+
     app.run(debug=True, port=port)

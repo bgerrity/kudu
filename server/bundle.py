@@ -8,7 +8,7 @@ import random
 # Encryption, decryption, shuffle, and unshuffle.
 class Bundle:
     def __init__(self, packets=[]):
-        self.packets = packets
+        self.packets = list(packets) # ordered
         self._shuffle_key = None
 
     def add_packet(self, packet):

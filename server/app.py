@@ -63,7 +63,6 @@ def get_response(id):
         except KeyError:
             return f"Already returned id:{id}", HTTPStatus.BAD_REQUEST
 
-
     return jsonify(response)
 
 # given an id, services its requested drop

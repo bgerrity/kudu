@@ -18,9 +18,6 @@ import sys
 from http import HTTPStatus
 from threading import Lock
 
-# launch the server and a clients
-
-
 class Dispatch:
     def __init__(self):
         self.num_clients = 0
@@ -44,15 +41,20 @@ def get_servr_port():
 
 # id will be the id that a client will hold
 # so when making a call to this the client will give it's id and public key
-@app.route("/publish_key/<int:id>/<string:key>", methods=['POST'])
-def publish_key(id, key):
+@app.route("/publish_key/<int:id>", methods=['POST'])
+def publish_key(id):
+    key = request.data
     with server_lock:
         keys.public_keys[id] = key
+        keys.num_clients = keys.num_clients + 1
 
     return f"Received key from {id}", HTTPStatus.ACCEPTED
 
 @app.route("/get_key/<int:id>", methods=['GET'])
 def get_key(id):
+    if keys.num_clients != 2:
+        return f"Wait", HTTPStatus.PROCESSING
+
     try:
         partner_key = keys.public_keys[id]
     except KeyError:

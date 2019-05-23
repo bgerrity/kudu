@@ -10,10 +10,12 @@ import io
 
 # generate a standard RsaKey instance
 def generate_rsa():
+    """Generate a standard RsaKey instance."""
     return RSA.generate(2048)
 
 # given an rsa key, returns an export format public key
 def export_rsa_public(key):
+    """Returns an export format public key given an rsa key."""
     if not isinstance(key, RSA.RsaKey):
         raise ValueError("param @key must be type RsaKey")
 
@@ -21,6 +23,7 @@ def export_rsa_public(key):
 
 # given an rsa key, returns an export format private key
 def export_rsa_private(key):
+    """Returns an export format private key given an rsa key."""
     if not isinstance(key, RSA.RsaKey):
         raise ValueError("param @key must be type RsaKey")
 
@@ -29,6 +32,7 @@ def export_rsa_private(key):
 # given bytes data and exported public_key
 # returns encrypted bytes
 def encrypt_rsa(data, public_key):
+    """Encrypts data given a key."""
     if not isinstance(data, bytes):
         raise ValueError("param @data must be type bytes")
     if not isinstance(public_key, bytes):
@@ -50,6 +54,7 @@ def encrypt_rsa(data, public_key):
 # given bytes data and exported private_key
 # returns decrypted bytes
 def decrypt_rsa(data, private_key):
+    """Decrypts data given a key."""
     if not isinstance(data, bytes):
         raise ValueError("param @data must be type bytes")
     if not isinstance(private_key, bytes):
@@ -75,12 +80,14 @@ def decrypt_rsa(data, private_key):
 
 # returns aes key as bytes
 def generate_aes():
+    """Generate an AES key."""
     key = get_random_bytes(16)
     return key
 
 # given bytes data and AES key
 # returns encrypted bytes
 def encrypt_aes(data, key):
+    """Encrypts data given a key."""
     if not isinstance(data, bytes):
         raise ValueError("param @data must be type bytes")
     if not isinstance(key, bytes):
@@ -95,6 +102,7 @@ def encrypt_aes(data, key):
 # given bytes data and AES key
 # returns decrypted bytes
 def decrypt_aes(data, key):
+    """Decrypts data given a key."""
     if not isinstance(data, bytes):
         raise ValueError("param @data must be type bytes")
     if not isinstance(key, bytes):

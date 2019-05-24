@@ -8,10 +8,7 @@ import json
 from collections import namedtuple
 from enum import Enum
 
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-
-# from bundle import Bundle
+import lib.easy_crypto as ec
 from packet import Packet
 
 Key_Pair = namedtuple("keys", ["public", "private"])
@@ -24,7 +21,7 @@ class Server:
 
     def __init__(self, client_count=0):
         self.client_count = client_count
-        self.key_pair = Server.gen_key_pair()
+        self.rsa_key = ec.generate_rsa()
 
         self.current_round = 0
         self.mode = Server.Modes.RECEIVING
@@ -32,13 +29,7 @@ class Server:
         self.deaddrops = {}
         self.packets = {}
 
-    @staticmethod
-    def gen_key_pair():
-        # TODO: return to generation when dispathc enabled
-        with open("server/fixed-key.pem", "rb") as f:
-            server_key = RSA.import_key(f.read())
-        # server_key = RSA.generate(2048)
-        return Key_Pair(server_key.publickey().export_key(), server_key.export_key())
+        
 
     def reset(self):
         self.current_round += 1
@@ -65,7 +56,7 @@ class Server:
 
         # process drops in
         for _, packet in self.packets.items():
-            packet.decrypt_and_process(self.key_pair.private)
+            # packet.decrypt_and_process(self.key_pair.private)
             self.deaddrops[packet.contents.drop] = packet.contents.message
 
         self.mode = Server.Modes.DISTRIBUTING

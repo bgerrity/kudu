@@ -12,11 +12,13 @@ class Packet:
     size = None # standardized size for packets
 
     def __init__(self, data=None, noise=False, origin=False, terminal=False, caller_id=None, client=False):
+        # raw data recieved for processing; initial 
         self.data = data
-        # Packet.validate_size(self.data)
 
-        self.symm_keys = None # the binary string used for encrypting back down the chain
-        self.payload = None # the binary string to pass up the chain
+        # the key or vector of keys to be used to encrypt (by server) or decrypt (by client)
+        self.symm_keys = None
+        # binary string prior to encryption or decryption to be sent onward
+        self.payload = None
 
         self.origin = origin
         self.terminal = terminal
@@ -43,10 +45,12 @@ class Packet:
         # exclusive to origin server: stores source ID
         self.caller_id = None
 
-        # exclusive to terminal server: stores parameters for deaddrop ops
+        # used by client and server to hold plain message
         self.contents = None
-        # exclusive to terminal server: stores parameters for deaddrop ops
+
+        # used by client and server to hold plain response collected from deaddrop 
         self.collected = None
+
 
     # Client Tools
 
@@ -58,13 +62,16 @@ class Packet:
         if not (self.contents.collect and self.contents.drop and self.contents.message):
             raise KeyError("missing key for client wrap")
 
-        self.payload = json.dumps(self.contents._asdict()).encode() # payload to json bytes
+        self.payload = json.dumps(self.contents._asdict()).encode() # payload to json str to bytes
         self.contents = None # clear
 
-        self.onion_encrypt(pub_keys)
+        self._onion_encrypt_pub(pub_keys)
 
-    # given vectors of servers' vector
-    def onion_encrypt(self, pub_keys):
+    def _onion_encrypt_pub(self, pub_keys):
+        """
+        Constructs layered encryption of payload symm_keys using passed pub_keys; operates front to back.
+        Stores results in payload.
+        """
         if not (self.client):
             raise ValueError("only origin can use onion encryption")
         if not (self.payload):
@@ -73,12 +80,12 @@ class Packet:
         # generate and store symm_key vector
         self.symm_keys = [ec.generate_aes() for _ in pub_keys]
 
-        onion = self.onion_encrypt_helper(pub_keys, self.symm_keys, self.payload)
+        onion = self._onion_encrypt_pub_helper(pub_keys, self.symm_keys, self.payload)
         self.data = onion
         self.payload = None
 
     @staticmethod
-    def onion_encrypt_helper(pub_keys, symm_keys, payload):
+    def _onion_encrypt_pub_helper(pub_keys, symm_keys, payload):
         """
         Encrypts payload in an onion scheme using public key.
         Returns final result as bytes.
@@ -96,20 +103,24 @@ class Packet:
 
         return encrypted
 
-
-    def client_process_down(self):
+    # use stored symm_key vector to de-onionize data
+    # stores in payload
+    def _onion_decrypt_symm(self):
+        """
+        Strips layered encryption from data using symm_keys member; operates front to back.
+        Stores results in payload.
+        """
         if not self.client:
             raise ValueError("not a client")
-        self.onion_decrypt()
+        elif not self.data:
+            raise KeyError("missing data for decrypt wrap")
+        elif not (self.symm_keys and isinstance(self.symm_keys, list)):
+            raise KeyError("invalid symm_keys vector")
 
-    # use stored symm_key vector to de-onionize returned value
-    def onion_decrypt(self):
-        pass # TODO: implement
-        # key = RSA.import_key(key_string)
-        # decipher_rsa = PKCS1_OAEP.new(key)
-        # self.data = decipher_rsa.decrypt(self.data) # FIXME: readd .decode() to
-
-
+        for k in self.symm_keys:
+            self.data = ec.decrypt_aes(self.data, k)
+        self.payload = self.data
+        self.data = None
 
 
     # Server Tools
@@ -131,6 +142,17 @@ class Packet:
         string_in = io.BytesIO(unpeeled) # process data string as file
         self.symm_keys, self.payload = [ string_in.read(x) for x in (ec.AES_SIZE, -1) ]
 
+
+    def onion_add_layer(self):
+        if self.client:
+            raise ValueError("not a server")
+        if not self.payload:
+            raise KeyError("missing payload for decrypt")
+        elif not (self.symm_keys and isinstance(self.symm_keys, bytes)):
+            raise KeyError("invalid symm_keys byte string")
+
+        self.data = ec.encrypt_aes(self.payload, self.symm_keys)
+        self.payload = None
 
     def prep_noise(self):
         raise NotImplementedError("haven't done noise")

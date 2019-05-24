@@ -1,5 +1,4 @@
 import sys, os, json
-import os
 
 import requests
 
@@ -43,7 +42,59 @@ server2.data = server1.payload
 server2.onion_peel_layer(rsa_priv_keys[2])
 print("Pass three done.")
 
-print(f"resulting payload:{server2.payload}")
+print("FeeFee:")
+# print(server2.payload)
+
+# print(f"resulting payload at terminal:{server2.payload}")
+
+
+# print(f"s2.symm:{server2.symm_keys}")
+# print(f"s2.payload:{server2.payload}")
+
+# enc = ec.encrypt_aes(server2.payload, server2.symm_keys)
+# print(enc)
+
+# enc2 = ec.encrypt_aes(enc, server1.symm_keys)
+
+# dec2 = ec.decrypt_aes(enc2, server1.symm_keys)
+
+# dec = ec.decrypt_aes(dec2, server2.symm_keys)
+# print(dec)
+
+
+server2.payload = "fe fi fo fum".encode()
+server2.onion_add_layer()
+
+server1.payload = server2.data
+server1.onion_add_layer()
+
+server0.payload = server1.data
+server0.onion_add_layer()
+
+# print("FooFoo:")
+# print(server0.data)
+# exit()
+
+# print(server1.data)
+# exit()
+c_packet.data = server0.data
+
+c_packet.onion_decrypt()
+print("FINAL")
+print(c_packet.payload)
+# print(vars(server2))
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

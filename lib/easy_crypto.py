@@ -78,10 +78,12 @@ def decrypt_rsa(data, private_key):
 
     return plaintext
 
+AES_SIZE = 16 # const key size for AES
+
 # returns aes key as bytes
 def generate_aes():
     """Generate an AES key."""
-    key = get_random_bytes(16)
+    key = get_random_bytes(AES_SIZE)
     return key
 
 # given bytes data and AES key

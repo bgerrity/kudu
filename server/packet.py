@@ -1,10 +1,9 @@
 # packet.py
 
-import json
-from collections import namedtuple
+import json, io
+from collections import namedtuple, deque
 
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
+import lib.easy_crypto as ec
 
 Contents = namedtuple("contents", ["collect", "drop", "message"])
 
@@ -12,68 +11,126 @@ Contents = namedtuple("contents", ["collect", "drop", "message"])
 class Packet:
     size = None # standardized size for packets
 
-    def __init__(self, data, terminal=False):
-        self.packet = data
-        Packet.validate_size(self.packet)
+    def __init__(self, data=None, noise=False, origin=False, terminal=False, caller_id=None, client=False):
+        self.data = data
+        # Packet.validate_size(self.data)
 
-        self.symm_key = None # the key used for encrypting back down the chain
+        self.symm_keys = None # the binary string used for encrypting back down the chain
         self.payload = None # the binary string to pass up the chain
 
-        self.contents = None # stores parameters for deaddrop ops
-
-        self.symm_key = None
+        self.origin = origin
         self.terminal = terminal
+        self.client = client
+        if self.client:
+            if self.origin or self.terminal:
+                raise NotImplementedError("cannot be client and origin/terminal")
+        else: # am server
+            if not self.origin:
+                raise NotImplementedError("no inter-server support")
+            elif not self.terminal:
+                raise NotImplementedError("no inter-server support")
 
-    def decrypt_and_process(self, key):
-        self.decrypt(key)
-        self.unwrap()
+        if caller_id and noise:
+            raise ValueError("can't have both id and be noise")
+        elif caller_id and not origin:
+            raise ValueError("id only exists at origin")
 
-    # use key to store a decrypted version
-    def decrypt(self, key_string):
-        key = RSA.import_key(key_string)
-        decipher_rsa = PKCS1_OAEP.new(key)
-        self.packet = decipher_rsa.decrypt(self.packet).decode()
+        # if a packet is created for dummy/statistical noise ops
+        self.noise = noise
+        if self.noise:
+            self.prep_noise()
 
-    # takes decrypted value as en clair json and fill instance with its values
-    # discards any extraneous values
-    # throws error if any not found (invalid)
-    def unwrap(self):
-        unwrapped = json.loads(self.packet)
-        self.symm_key = unwrapped.get("symm_key")
-        self.payload = unwrapped["payload"]
+        # exclusive to origin server: stores source ID
+        self.caller_id = None
 
-        # if terminal, then symmetric key is done: can directly access payload
-        if self.terminal:
-            self.contents = Contents(
-                self.payload.get("collect"),
-                self.payload.get("drop"),
-                self.payload.get("message")
-            )
+        # exclusive to terminal server: stores parameters for deaddrop ops
+        self.contents = None
+        # exclusive to terminal server: stores parameters for deaddrop ops
+        self.collected = None
 
-            if not (self.contents.collect and self.contents.drop and self.contents.message):
-                raise ValueError("missing key for unwrap")
-        else:
-            raise NotImplementedError("intermediate chained server")
+    # Client Tools
+
+    # used by client to prep request
+    def client_prep_up(self, pub_keys):
+        if not self.client:
+            raise ValueError("not a client")
+
+        if not (self.contents.collect and self.contents.drop and self.contents.message):
+            raise KeyError("missing key for client wrap")
+
+        self.payload = json.dumps(self.contents._asdict()).encode() # payload to json bytes
+        self.contents = None # clear
+
+        self.onion_encrypt(pub_keys)
+
+    # given vectors of servers' vector
+    def onion_encrypt(self, pub_keys):
+        if not (self.client):
+            raise ValueError("only origin can use onion encryption")
+        if not (self.payload):
+            raise ValueError("payload missing")
+
+        # generate and store symm_key vector
+        self.symm_keys = [ec.generate_aes() for _ in pub_keys]
+
+        onion = self.onion_encrypt_helper(pub_keys, self.symm_keys, self.payload)
+        self.data = onion
+        self.payload = None
+
+    @staticmethod
+    def onion_encrypt_helper(pub_keys, symm_keys, payload):
+        """
+        Encrypts payload in an onion scheme using public key.
+        Returns final result as bytes.
+        Format: ENC(public key, (symm_key, nested_payload))
+        """
+        # recursively work from last to first (right to left)
+
+        # base: 1 key pair; use straight up
+        # recursive: more; generate and use nested payload
+        payload_val = payload if len(pub_keys) == 1 else Packet.onion_encrypt_helper(pub_keys[:-1], symm_keys[:-1], payload)
+
+        prepped = b"".join((symm_keys[-1], payload_val))
+
+        encrypted = ec.encrypt_rsa(prepped, pub_keys[-1])
+
+        return encrypted
 
 
-    # use key to store an encrypted version
-    def encrypt(self, key):
-        pass
-        # TODO: use key to encrypt packet
-        self.packet = self.packet
+    def client_process_down(self):
+        if not self.client:
+            raise ValueError("not a client")
+        self.onion_decrypt()
 
-        # TODO: enable with crypto
-        self.validate_size()
-        # raise NotImplementedError()
+    # use stored symm_key vector to de-onionize returned value
+    def onion_decrypt(self):
+        pass # TODO: implement
+        # key = RSA.import_key(key_string)
+        # decipher_rsa = PKCS1_OAEP.new(key)
+        # self.data = decipher_rsa.decrypt(self.data) # FIXME: readd .decode() to
 
-    def validate(self):
-        self.validate_size()
-    #     raise NotImplementedError()
 
-    # checks passed object against size constraint
-    def validate_size(self):
-        pass
-        # if len(packet) != Packet.size: # TODO: enable
-        #     raise ValueError("size of packet is incorrect")
-        #
-        # raise NotImplementedError()
+
+
+    # Server Tools
+
+    # given a private key decrypts data and breaks into symm key and nested payload
+    def onion_peel_layer(self, private_key):
+        if self.client:
+            raise ValueError("client should not use peel; only server")
+        elif not isinstance(private_key, bytes):
+            raise ValueError("data is missing or invalid type")
+        elif not (self.data and isinstance(self.data, bytes)):
+            raise ValueError("data is missing or invalid type")
+        elif self.symm_keys or self.payload:
+            raise ValueError("symm_key and/or payload filled; already peeled")
+
+        unpeeled = ec.decrypt_rsa(self.data, private_key)
+        self.data = None
+
+        string_in = io.BytesIO(unpeeled) # process data string as file
+        self.symm_keys, self.payload = [ string_in.read(x) for x in (ec.AES_SIZE, -1) ]
+
+
+    def prep_noise(self):
+        raise NotImplementedError("haven't done noise")

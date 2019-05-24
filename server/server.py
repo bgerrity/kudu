@@ -21,7 +21,7 @@ class Server:
 
     def __init__(self, client_count=0):
         self.client_count = client_count
-        self.rsa_key = ec.generate_rsa()
+        self._rsa_key = ec.generate_rsa()
 
         self.current_round = 0
         self.mode = Server.Modes.RECEIVING
@@ -75,3 +75,7 @@ class Server:
             self.reset()
 
         return result
+
+    def get_public_key(self):
+        """Returns this server's public RSA key."""
+        return ec.export_rsa_public(self._rsa_key)

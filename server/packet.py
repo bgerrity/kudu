@@ -19,75 +19,8 @@ Contents = namedtuple("contents", ["collect", "drop", "message"])
 class Packet:
     size = None # standardized size for packets
 
-<<<<<<< HEAD
-    def __init__(self, data, terminal=False):
-        self.packet = data
-        Packet.validate_size(self.packet)
-
-        self.symm_key = None # the key used for encrypting back down the chain
-        self.payload = None # the binary string to pass up the chain
-
-        self.contents = None # stores parameters for deaddrop ops
-
-        self.symm_key = None
-        self.terminal = terminal
-
-    def decrypt_and_process(self, key):
-        self.decrypt(key)
-        self.unwrap()
-
-    # use key to store a decrypted version
-    def decrypt(self, key_string):
-        key = RSA.import_key(key_string)
-        decipher_rsa = PKCS1_OAEP.new(key)
-        self.packet = decipher_rsa.decrypt(self.packet).decode()
-
-    # takes decrypted value as en clair json and fill instance with its values
-    # discards any extraneous values
-    # throws error if any not found (invalid)
-    def unwrap(self):
-        unwrapped = json.loads(self.packet)
-        self.symm_key = unwrapped.get("symm_key")
-        self.payload = unwrapped["payload"]
-
-        # if terminal, then symmetric key is done: can directly access payload
-        if self.terminal:
-            self.contents = Contents(
-                self.payload.get("collect"),
-                self.payload.get("drop"),
-                self.payload.get("message")
-            )
-
-            if not (self.contents.collect and self.contents.drop and self.contents.message):
-                raise ValueError("missing key for unwrap")
-        else:
-            raise NotImplementedError("intermediate chained server")
-
-
-    # use key to store an encrypted version
-    def encrypt(self, key):
-        pass
-        # TODO: use key to encrypt packet
-        self.packet = self.packet
-
-        # TODO: enable with crypto
-        self.validate_size()
-        # raise NotImplementedError()
-
-    def validate(self):
-        self.validate_size()
-    #     raise NotImplementedError()
-
-    # checks passed object against size constraint
-    def validate_size(self):
-        pass
-        # if len(packet) != Packet.size: # TODO: enable
-        #     raise ValueError("size of packet is incorrect")
-        #
-        # raise NotImplementedError()
-=======
     def __init__(self, data=None, noise=False, origin=False, terminal=False, caller_id=None, client=False):
-        # raw data recieved for processing; initial 
+        # raw data recieved for processing; initial
         self.data = data
 
         # the key or vector of keys to be used to encrypt (by server) or decrypt (by client)
@@ -123,7 +56,7 @@ class Packet:
         # used by client and server to hold plain message
         self.contents = None
 
-        # used by client and server to hold plain response collected from deaddrop 
+        # used by client and server to hold plain response collected from deaddrop
         self.collected = None
 
 
@@ -229,4 +162,3 @@ class Packet:
 
     def prep_noise(self):
         raise NotImplementedError("haven't done noise")
->>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370

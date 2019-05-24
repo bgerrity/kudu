@@ -1,17 +1,10 @@
 # packet.py
 
-<<<<<<< HEAD
-import json
-from collections import namedtuple
 
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-=======
 import json, io
 from collections import namedtuple, deque
 
 import lib.easy_crypto as ec
->>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370
 
 Contents = namedtuple("contents", ["collect", "drop", "message"])
 

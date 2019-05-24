@@ -8,10 +8,14 @@ import json
 from collections import namedtuple
 from enum import Enum
 
+<<<<<<< HEAD
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
 # from bundle import Bundle
+=======
+import lib.easy_crypto as ec
+>>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370
 from packet import Packet
 
 Key_Pair = namedtuple("keys", ["public", "private"])
@@ -24,7 +28,11 @@ class Server:
 
     def __init__(self, client_count=0):
         self.client_count = client_count
+<<<<<<< HEAD
         self.key_pair = Server.gen_key_pair()
+=======
+        self._rsa_key = ec.generate_rsa()
+>>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370
 
         self.current_round = 0
         self.mode = Server.Modes.RECEIVING
@@ -32,6 +40,7 @@ class Server:
         self.deaddrops = {}
         self.packets = {}
 
+<<<<<<< HEAD
     @staticmethod
     def gen_key_pair():
         # TODO: return to generation when dispathc enabled
@@ -39,6 +48,9 @@ class Server:
             server_key = RSA.import_key(f.read())
         # server_key = RSA.generate(2048)
         return Key_Pair(server_key.publickey().export_key(), server_key.export_key())
+=======
+        
+>>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370
 
     def reset(self):
         self.current_round += 1
@@ -65,7 +77,11 @@ class Server:
 
         # process drops in
         for _, packet in self.packets.items():
+<<<<<<< HEAD
             packet.decrypt_and_process(self.key_pair.private)
+=======
+            # packet.decrypt_and_process(self.key_pair.private)
+>>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370
             self.deaddrops[packet.contents.drop] = packet.contents.message
 
         self.mode = Server.Modes.DISTRIBUTING
@@ -84,3 +100,10 @@ class Server:
             self.reset()
 
         return result
+<<<<<<< HEAD
+=======
+
+    def get_public_key(self):
+        """Returns this server's public RSA key."""
+        return ec.export_rsa_public(self._rsa_key)
+>>>>>>> 3b1978e87cd20035740baa7a422c13f93bacc370

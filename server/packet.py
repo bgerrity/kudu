@@ -24,11 +24,11 @@ class Packet:
         if self.client:
             if self.origin or self.terminal:
                 raise NotImplementedError("cannot be client and origin/terminal")
-        else: # am server
-            if not self.origin:
-                raise NotImplementedError("no inter-server support")
-            elif not self.terminal:
-                raise NotImplementedError("no inter-server support")
+        # else: # am server
+        #     if not self.origin:
+        #         raise NotImplementedError("no inter-server support")
+        #     elif not self.terminal:
+        #         raise NotImplementedError("no inter-server support")
 
         if caller_id and noise:
             raise ValueError("can't have both id and be noise")
@@ -88,11 +88,11 @@ class Packet:
 
         # base: 1 key pair; use straight up
         # recursive: more; generate and use nested payload
-        payload_val = payload if len(pub_keys) == 1 else Packet.onion_encrypt_helper(pub_keys[:-1], symm_keys[:-1], payload)
+        payload_val = payload if len(pub_keys) == 1 else Packet.onion_encrypt_helper(pub_keys[1:], symm_keys[1:], payload)
 
-        prepped = b"".join((symm_keys[-1], payload_val))
+        prepped = b"".join((symm_keys[0], payload_val))
 
-        encrypted = ec.encrypt_rsa(prepped, pub_keys[-1])
+        encrypted = ec.encrypt_rsa(prepped, pub_keys[0])
 
         return encrypted
 

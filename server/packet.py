@@ -95,7 +95,7 @@ class Packet:
 
         # base: 1 key pair; use straight up
         # recursive: more; generate and use nested payload
-        payload_val = payload if len(pub_keys) == 1 else Packet.onion_encrypt_helper(pub_keys[1:], symm_keys[1:], payload)
+        payload_val = payload if len(pub_keys) == 1 else Packet._onion_encrypt_pub_helper(pub_keys[1:], symm_keys[1:], payload)
 
         prepped = b"".join((symm_keys[0], payload_val))
 
@@ -103,12 +103,10 @@ class Packet:
 
         return encrypted
 
-    # use stored symm_key vector to de-onionize data
-    # stores in payload
-    def _onion_decrypt_symm(self):
+    def onion_decrypt_symm(self):
         """
         Strips layered encryption from data using symm_keys member; operates front to back.
-        Stores results in payload.
+        Stores results in payload; clears data.
         """
         if not self.client:
             raise ValueError("not a client")

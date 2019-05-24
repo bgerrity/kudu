@@ -79,9 +79,8 @@ server0.onion_add_layer()
 # exit()
 c_packet.data = server0.data
 
-c_packet.onion_decrypt()
-print("FINAL")
-print(c_packet.payload)
+c_packet.onion_decrypt_symm()
+print(f"payload final:{c_packet.payload}")
 # print(vars(server2))
 
 

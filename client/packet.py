@@ -1,98 +1,55 @@
-# packet.py
+# client/packet.py
 
 import json, io
-from collections import namedtuple, deque
+from collections import namedtuple
 
 import lib.easy_crypto as ec
 
-Contents = namedtuple("contents", ["collect", "drop", "message"])
 
 # wrapper and validator
 class Packet:
     size = None # standardized size for packets
 
-    def __init__(self, data=None, noise_size=None, origin=False, terminal=False, caller_id=None, client=False):
-        # raw data recieved for processing; initial 
-        self.data = data
+    def __init__(self):
+        # raw data recieved for processing; initial
+        self._inbox = None
+        # processed data to be sent onward
+        self._outbox = None
 
-        # the key or vector of keys to be used to encrypt (by server) or decrypt (by client)
-        self.symm_keys = None
-        # binary string prior to encryption or decryption to be sent onward
-        self.payload = None
-
-        self.origin = origin
-        self.terminal = terminal
-        self.client = client
-        if self.client:
-            if self.origin or self.terminal:
-                raise NotImplementedError("cannot be client and origin/terminal")
-        # else: # am server
-        #     if not self.origin:
-        #         raise NotImplementedError("no inter-server support")
-        #     elif not self.terminal:
-        #         raise NotImplementedError("no inter-server support")
-
-        if caller_id and noise_size:
-            raise ValueError("can't have both id and be noise")
-        elif caller_id and not origin:
-            raise ValueError("id only exists at origin")
+        # the key to be collected on pass-up and used on the pass-down
+        self._symm_keys = None
 
         # if a packet is created for dummy/statistical noise ops
-        self.noise = noise_size
-        if self.noise:
-            self.prep_noise(noise_size)
+        self.noise = False
 
-        # exclusive to origin server: stores source ID
+        self.payload = None
+
         self.caller_id = None
-
-        # used by client and server to hold plain message
-        self.contents = None
-
-        # used by client and server to hold plain response collected from deaddrop 
-        self.collected = None
-
-
-    # Client Tools
 
     def client_prep_up(self, pub_keys):
         """
-        Onion-encrypts the payload using param pub_keys (first_key -> outermost).
+        Onion-encrypts the payload using param pub_keys (first_key -> outermost_enc).
         Generates a symm_keys vector for the field and nests.
         Stores results in data field; clears payload and contents fields. 
         """
-        
-        if not self.client:
-            raise ValueError("not a client")
-        elif not (self.contents.collect and self.contents.drop and self.contents.message):
-            raise KeyError("missing key for client wrap")
+        if not self.payload:
+            raise ValueError("payload not filled")
 
-        self.payload = json.dumps(self.contents._asdict()).encode() # payload to json str to bytes
-        self.contents = None # clear
+        # generate symm_keys
+        self._symm_keys = [ec.generate_aes() for _ in pub_keys]
+        # use keys to make an onion
+        onion = Packet._onion_encrypt_pub(pub_keys, self._symm_keys, self.payload)
+        self._outbox = onion
 
-        self._onion_encrypt_pub(pub_keys)
-
-    def _onion_encrypt_pub(self, pub_keys):
-        """
-        Constructs layered encryption of payload symm_keys using passed pub_keys; operates front to back.
-        Stores results in payload.
-        """
-
-        if not (self.client):
-            raise ValueError("only origin can use onion encryption")
-        if not (self.payload):
-            raise ValueError("payload missing")
-
-        # generate and store symm_key vector
-        self.symm_keys = [ec.generate_aes() for _ in pub_keys]
-
-        onion = self._onion_encrypt_pub_helper(pub_keys, self.symm_keys, self.payload)
-        self.data = onion
-        self.payload = None
+    def send_out(self):
+        outbound =  self._outbox
+        self._outbox = None
+        return outbound
 
     @staticmethod
-    def _onion_encrypt_pub_helper(pub_keys, symm_keys, payload):
+    def _onion_encrypt_pub(pub_keys, symm_keys, payload):
         """
-        Encrypts payload in an onion scheme using public key.
+        Encrypts payload in an onion scheme using public key (nests one symm_key in each layer)
         Returns final result as bytes.
         Format: ENC(public key, (symm_key, nested_payload))
         """
@@ -101,7 +58,7 @@ class Packet:
 
         # base: 1 key pair; use straight up
         # recursive: more; generate and use nested payload
-        payload_val = payload if len(pub_keys) == 1 else Packet._onion_encrypt_pub_helper(pub_keys[1:], symm_keys[1:], payload)
+        payload_val = payload if len(pub_keys) == 1 else Packet._onion_encrypt_pub(pub_keys[1:], symm_keys[1:], payload)
 
         prepped = b"".join((symm_keys[0], payload_val))
 
@@ -112,62 +69,19 @@ class Packet:
     def onion_decrypt_symm(self):
         """
         Strips layered encryption from data using symm_keys member; operates front to back.
-        Stores results in payload; clears data.
+        Stores results in payload; clears inbox and symm_keys.
         """
 
-        if not self.client:
-            raise ValueError("not a client")
-        elif not self.data:
-            raise KeyError("missing data for decrypt wrap")
-        elif not (self.symm_keys and isinstance(self.symm_keys, list)):
-            raise KeyError("invalid symm_keys vector")
+        if self._outbox:
+            raise ValueError("outbox already filled")
+        elif not self._inbox:
+            raise ValueError("missing data for decrypt unwrap")
+        elif not (self._symm_keys and isinstance(self._symm_keys, list)):
+            raise ValueError("invalid symm_keys vector")
 
-        for k in self.symm_keys:
-            self.data = ec.decrypt_aes(self.data, k)
-        self.payload = self.data
-        self.data = None
-
-
-    # Server Tools
-
-    # given a private key decrypts data and breaks into symm key and nested payload
-    def onion_peel_layer(self, private_key):
-        """
-        Strips layered encryption from data using symm_keys member; operates front to back.
-        Stores results in payload; clears data.
-        """
-
-        if self.client:
-            raise ValueError("client should not use peel; only server")
-        elif not isinstance(private_key, bytes):
-            raise ValueError("data is missing or invalid type")
-        elif not (self.data and isinstance(self.data, bytes)):
-            raise ValueError("data is missing or invalid type")
-        elif self.symm_keys or self.payload:
-            raise ValueError("symm_key and/or payload filled; already peeled")
-
-        unpeeled = ec.decrypt_rsa(self.data, private_key)
-        self.data = None
-
-        string_in = io.BytesIO(unpeeled) # process data string as file
-        self.symm_keys, self.payload = [ string_in.read(x) for x in (ec.AES_SIZE, -1) ]
-
-
-    def onion_add_layer(self):
-        """
-        Strips layered encryption from data using symm_keys member; operates front to back.
-        Stores results in payload; clears data.
-        """
-
-        if self.client:
-            raise ValueError("not a server")
-        if not self.payload:
-            raise KeyError("missing payload for decrypt")
-        elif not (self.symm_keys and isinstance(self.symm_keys, bytes)):
-            raise KeyError("invalid symm_keys byte string")
-
-        self.data = ec.encrypt_aes(self.payload, self.symm_keys)
-        self.payload = None
-
-    def prep_noise(self, size):
-        raise NotImplementedError("haven't done noise")
+        work = self._inbox
+        for k in self._symm_keys:
+            work = ec.decrypt_aes(work, k)
+        self._outbox = work
+        self._inbox = None
+        self._symm_keys = None

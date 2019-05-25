@@ -22,7 +22,7 @@ class Packet:
         self.noise = False
 
 
-    def load_up(self,data=None):
+    def load_up(self, data):
         if not isinstance(data, bytes):
             raise ValueError("data is invalid type")
         elif self._symm_key:
@@ -31,7 +31,7 @@ class Packet:
             raise ValueError("already loaded")
         self._inbox = data
     
-    def load_down(self,data=None):
+    def load_down(self, data):
         if not isinstance(data, bytes):
             raise ValueError("data is invalid type")
         elif not self._symm_key:

@@ -41,6 +41,14 @@ class Packet:
         onion = Packet._onion_encrypt_pub(pub_keys, self._symm_keys, self.payload)
         self._outbox = onion
 
+    def client_prep_down(self, data):
+        """
+        TODO: write me
+        """
+
+        self._inbox = data
+        self._onion_decrypt_symm()
+
     def send_out(self):
         outbound =  self._outbox
         self._outbox = None
@@ -66,7 +74,7 @@ class Packet:
 
         return encrypted
 
-    def onion_decrypt_symm(self):
+    def _onion_decrypt_symm(self):
         """
         Strips layered encryption from data using symm_keys member; operates front to back.
         Stores results in payload; clears inbox and symm_keys.

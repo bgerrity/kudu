@@ -7,8 +7,8 @@ import random
 # Includes facilites for core Vuvuzela operations:
 # Encryption, decryption, shuffle, and unshuffle.
 class Bundle:
-    def __init__(self, packets=[]):
-        self.packets = packets # useless unless ordered
+    def __init__(self, packets=None):
+        self.packets = packets if packets else []
         self._shuffle_key = None
 
     def add_packet(self, packet):

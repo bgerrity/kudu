@@ -11,150 +11,77 @@ sys.path.append(os.path.abspath('../Kudu'))
 
 import lib.easy_crypto as ec
 
-# class Server:
-#     class Modes(Enum):
-#         RECEIVING = 1
-#         PROCESSING = 2
-#         DISTRIBUTING = 3
+class Server:
+    class Modes(Enum):
+        RECEIVING = 1
+        PROCESSING = 2
+        DISTRIBUTING = 3
 
-#     def __init__(self, client_count=0, server_count=3):
-#         self.client_count = client_count
-#         self._rsa_key = ec.generate_rsa()
+    def __init__(self, client_count=0, server_count=3):
+        self.client_count = client_count
+        self._rsa_key = ec.generate_rsa()
 
-#         self.current_round = 0
-#         self.mode = Server.Modes.RECEIVING
+        self.current_round = 0
+        self.mode = Server.Modes.RECEIVING
 
-#         self.deaddrops = {}
-#         self.packets = set()
+        self.deaddrops = {}
+        self.packets = set()
 
-#         self.bundle = None
+        self.bundle = None
 
         
 
-#     def reset(self):
-#         if self.mode != Server.Modes.DISTRIBUTING:
-#             raise ValueError("not ready to reset")
+    def reset(self):
+        if self.mode != Server.Modes.DISTRIBUTING:
+            raise ValueError("not ready to reset")
 
-#         self.current_round += 1
-#         self.mode = Server.Modes.RECEIVING
+        self.current_round += 1
+        self.mode = Server.Modes.RECEIVING
 
-#         self.deaddrops = {}
-#         self.packets = set()
+        self.deaddrops = {}
+        self.packets = set()
 
-#         self.bundle = None
+        self.bundle = None
 
-#     # handles
-#     def collect_request(self, id, data):
-#         if self.mode != Server.Modes.RECEIVING:
-#             raise ValueError("not ready to receive")
+    # handles
+    def collect_request(self, id, data):
+        if self.mode != Server.Modes.RECEIVING:
+            raise ValueError("not ready to receive")
 
-#         self.packets.add(Packet(data=data, origin=True, caller_id=id))
+        self.packets.add(Packet(data=data, origin=True, caller_id=id))
 
-#         # if all expected are received, process them in
-#         if len(self.packets) == self.client_count:
-#             self.mode = Server.Modes.PROCESSING
-#             self.process_requests()
-
-
-#     def process_requests(self):
-#         if self.mode != Server.Modes.PROCESSING:
-#             raise ValueError("not ready to process")
-#         elif self.bundle:
-#             raise ValueError("not ready to process")
+        # if all expected are received, process them in
+        if len(self.packets) == self.client_count:
+            self.mode = Server.Modes.PROCESSING
+            self.process_requests()
 
 
-#         bundle
+    def process_requests(self):
+        if self.mode != Server.Modes.PROCESSING:
+            raise ValueError("not ready to process")
+        elif self.bundle:
+            raise ValueError("not ready to process")
+
+        self.mode = Server.Modes.DISTRIBUTING
+
+    def return_request(self, id):
+        if self.mode != Server.Modes.DISTRIBUTING:
+            raise ValueError("not ready to distribute")
+        elif id not in self.packets:
+            raise ValueError("no such id was received")
+
+        requested_drop = self.packets[id].contents.collect
+        result = self.deaddrops.pop(requested_drop)
 
 
+        if len(self.deaddrops) == 0: # exit distribute mode and return to recieving
+            self.reset()
 
+        return result
 
-#         self.mode = Server.Modes.DISTRIBUTING
-
-#     def return_request(self, id):
-#         if self.mode != Server.Modes.DISTRIBUTING:
-#             raise ValueError("not ready to distribute")
-#         elif id not in self.packets:
-#             raise ValueError("no such id was received")
-
-#         requested_drop = self.packets[id].contents.collect
-#         result = self.deaddrops.pop(requested_drop)
-
-
-#         if len(self.deaddrops) == 0: # exit distribute mode and return to recieving
-#             self.reset()
-
-#         return result
-
-#     def get_public_key(self):
-#         """Returns this server's public RSA key."""
-#         return ec.export_rsa_public(self._rsa_key)
-
-
-
-# # A representation of inter-server communication: Namely, the list of operable
-# # requests to be fulfilled for a client (a bundle of packets).
-# # Includes facilites for core Vuvuzela operations:
-# # Encryption, decryption, shuffle, and unshuffle.
-# class Bundle:
-#     def __init__(self):
-#         self._shuffle_key = None
-
-
-#     def load_up(self, raws):
-#         self.packets = [Packet() for _ in raws]
-#         for r, p in zip(raws, self.packets):
-#             p.load_up(r)
-
-
-#     def append_raw(self, raw):
-#         p = Packet()
-#         p.load_up(raw)
-#         self.packets.append(p)
-
-#     # Inter-server ops
-
-    
-#     def send_up(self, private_key):
-#         """
-#         Given the servers private key, decrypts each packet.
-#         """
-#         for p in self.packets:
-#             p.onion_peel_layer(private_key)
-#         self._forward_shuffle_packets()
-        
-#         upbound = [p.send_out() for p in self.packets]
-#         return upbound
-
-#     # preps for passing back down chain
-#     def prep_down(self, key):
-#         for p in self.packets:
-#             p.onion_add_layer()
-#         self._reverse_shuffle_packets()
-        
-#         downbound = [p.send_out() for p in self.packets]
-#         self.packets = []
-#         return downbound
-
-#     # shuffles the bundled packets using an optionally provided key
-#     # returns shuffle map (list of original indices)
-#     def _forward_shuffle_packets(self):
-#         if self._shuffle_key:
-#             raise ValueError("already shuffled")
-
-#         indexed = list(enumerate(self.packets))
-#         random.shuffle(indexed)
-
-#         self.packets = [packet for _, packet in indexed]
-#         self._shuffle_key = [i for i, _ in indexed]
-
-#     # given the key, performs the unshuffle
-#     def _reverse_shuffle_packets(self):
-#         if not self._shuffle_key:
-#             raise ValueError("not shuffled")
-
-#         self.packets = [packet for _, packet in \
-#             sorted(zip(self._shuffle_key, self.packets), key=lambda x: x[0])]
-#         self._shuffle_key = None
+    def get_public_key(self):
+        """Returns this server's public RSA key."""
+        return ec.export_rsa_public(self._rsa_key)
 
 class Packet:
     def __init__(self):

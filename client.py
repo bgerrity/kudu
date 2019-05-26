@@ -3,6 +3,7 @@
 from Cryptodome.Cipher import AES, PKCS1_OAEP
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Random import get_random_bytes
+from lib import easy_crypto as ec
 from http import HTTPStatus
 import requests
 import sys

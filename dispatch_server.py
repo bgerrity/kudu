@@ -23,11 +23,32 @@ class Dispatch:
         self.num_clients = 0
         # dictionary that will hold all public keys
         self.public_keys = {}
+        self.DH_pub_keys = {}
 
 app = Flask(__name__)
 keys = Dispatch()
 server_lock = Lock() # general purpose lock
 
+
+@app.route("/publish_DH_key/<int:id>", methods=['POST'])
+def publish_DH_key(id):
+    key = request.data
+    with server_lock:
+        keys.DH_pub_keys[id] = key
+
+    return f"Received DH key from {id}", HTTPStatus.ACCEPTED
+
+@app.route("/get_DH_key/<int:id>", methods=["GET"])
+def get_DH_key(id):
+    if keys.num_clients != 2:
+        return f"Wait", HTTPStatus.PROCESSING
+
+    try:
+        partner_key = keys.DH_pub_keys[id]
+    except KeyError:
+        return f"No_Key", HTTPStatus.BAD_REQUEST
+
+    return f"{partner_key}", HTTPStatus.ACCEPTED
 
 # dispatch server port
 @app.route("/dispatch_port", methods=['GET'])

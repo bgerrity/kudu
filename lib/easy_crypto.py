@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 # easy_crypto.py
 
-from Crypto.PublicKey import RSA
-from Crypto.Random import get_random_bytes
-from Crypto.Cipher import AES, PKCS1_OAEP
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Random import get_random_bytes
+from Cryptodome.Cipher import AES, PKCS1_OAEP
+import pyDHE
 import io
 
 # shamelessly stolen from https://pycryptodome.readthedocs.io/en/latest/src/examples.html
@@ -121,6 +122,28 @@ def decrypt_aes(data, key):
 
     return plaintext
 
+def DH_generate_private_key():
+
+    private_key = pyDHE.new()
+    return private_key
+
+def DH_get_public_key(client_private_key):
+    if not isinstance(client_private_key, pyDHE.DHE):
+        raise ValueError("param @client_private_key must be of type pyDHE.DHE")
+
+    public_key = client_private_key.getPublicKey()
+    return public_key
+
+def DH_generate_shared_secret(client_private_key, peer_public_key):
+    if not isinstance(client_private_key, pyDHE.DHE):
+        raise ValueError("param @peer_public_key must be type PyDHE")
+    if not isinstance(peer_public_key, int):
+        raise ValueError("param @client_private_key must be of type int")
+
+    shared_key = client_private_key.update(peer_public_key)
+
+    return shared_key
+
 # TESTING SCRIPT
 if __name__ == '__main__':
     rsa_plain = "life is like a box of chocolates".encode("utf-8")
@@ -143,5 +166,19 @@ if __name__ == '__main__':
     aes_encrypted = encrypt_aes(aes_plain, aes_key)
     aes_decrypted = decrypt_aes(aes_encrypted, aes_key)
 
-
     print(aes_decrypted.decode("utf-8"))
+
+    # Diffie Hellman testing
+    a_private = DH_generate_private_key()
+    b_private = DH_generate_private_key()
+
+    a_public = DH_get_public_key(a_private)
+    b_public = DH_get_public_key(b_private)
+
+    a_shared = DH_generate_shared_secret(a_private, b_public)
+    b_shared = DH_generate_shared_secret(b_private, a_public)
+
+    if a_shared == b_shared:
+        print("DH derived same number")
+    else:
+        print("DH failed")

@@ -50,7 +50,7 @@ class Packet:
         self._onion_decrypt_symm()
 
     def send_out(self):
-        outbound =  self._outbox
+        outbound = self._outbox
         self._outbox = None
         return outbound
 

@@ -3,6 +3,7 @@
 from Cryptodome.Cipher import AES, PKCS1_OAEP
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Random import get_random_bytes
+from http import HTTPStatus
 import requests
 import sys
 import time
@@ -59,11 +60,15 @@ class Client:
 
 def exchangeKeys():
     response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
-    print("Public Key posted")
-    time.sleep(2)
-    response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
+    print(response.status_code)
 
-    print(response2.content)
+    if response.status_code == HTTPStatus.ACCEPTED:
+        print("Public Key posted")
+
+    response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
+    while(response2.status_code != HTTPStatus.ACCEPTED):
+        time.sleep(1)
+        response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
 
 message = ""
 client = Client()

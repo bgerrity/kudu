@@ -11,6 +11,7 @@ def spin_up_dispatch_server():
 def spin_up_clients():
     subprocess.call(["gnome-terminal", "--", "./client.py", "1", "2"])
     subprocess.call(["gnome-terminal", "--", "./client.py", "2", "1"])
+    print("started clients")
 
 spin_up_dispatch_server()
 spin_up_clients()

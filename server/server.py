@@ -1,8 +1,9 @@
 #! /usr/bin/env python3
+# server/server.py
 
 # server.py
-# state interface class for server: implemented as webserver process state,
-# could be attached to database for RESTful
+# state interface class for server: implemented as webserver process state
+# hosts server's business logic; could be attached to database for RESTful api
 
 import os, sys, io, json, random
 from enum import Enum
@@ -25,10 +26,10 @@ class Server:
 
         # vector of server keys
         self._keys = [ec.generate_rsa() for _ in range(self.SERVER_COUNT)]
-        with open("server_keys.json", "w") as f: # export keys for use by clients (test without dispatch)
+        with open("server_keys.json", "w") as f: # export keys for use by clients (test without dispatch) TODO: remove on merge with dispatch branch
             f.write(json.dumps(self._get_privates()))
 
-        self._current_round = 0
+        self.current_round = 0
         self.mode = Server.Modes.RECEIVING
 
         self._id_map = OrderedDict() # {id: data}
@@ -44,7 +45,7 @@ class Server:
         if self.mode != Server.Modes.DISTRIBUTING:
             raise ValueError("not ready to reset")
 
-        self._current_round += 1
+        self.current_round += 1
         self.mode = Server.Modes.RECEIVING
 
         self._id_map = OrderedDict()

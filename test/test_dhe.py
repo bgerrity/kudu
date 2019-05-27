@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# test/test_dhe.py
+
 import sys, os
 sys.path.append(os.path.abspath('../Kudu'))
 

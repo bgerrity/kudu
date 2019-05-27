@@ -65,7 +65,7 @@ class Client:
     def decrypt(self):
         raise NotImplementedError
 
-def exchangeKeys():
+'''def exchangeKeys():
     response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
     print(response.status_code)
 
@@ -75,19 +75,23 @@ def exchangeKeys():
     response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
     while(response2.status_code != HTTPStatus.ACCEPTED):
         time.sleep(1)
-        response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
+        response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)'''
 
 def postKeys():
+    # posts the public RSA key to the server
     response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
     if response.status_code == HTTPStatus.ACCEPTED:
         print("Public Key posted")
 
+    # posts the diffie hellman public key to the server
+    # TODO change DH_public according to the new return value in easy_crypto
     DH_public = str(ec.DH_get_public_key(client.DH_key)).encode()
     print(ec.DH_get_public_key(client.DH_key))
     response2 = requests.post('http://127.0.0.1:5000/publish_DH_key/'+ client.id, data = DH_public)
     if response2.status_code == HTTPStatus.ACCEPTED:
         print("Public DH Key posted")
 
+    # when done with posting keys increments the number of users 
     response3 = requests.post('http://127.0.0.1:5000/increment_users')
     if response3.status_code == HTTPStatus.ACCEPTED:
         print("Client finished posting")
@@ -95,17 +99,20 @@ def postKeys():
 def getKeys():
     response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
     while(response.status_code != HTTPStatus.ACCEPTED):
-        time.sleep(5)
+        time.sleep(1)
         response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
     client.partner_key = response.content
 
     response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
     while(response2.status_code != HTTPStatus.ACCEPTED):
-        time.sleep(5)
+        time.sleep(1)
         response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
 
-    peer_public_key = int(response2.content.decode())
-    print(peer_public_key)
+    #TODO: figure out how to get the key in response2 to the client
+    '''peer_public_key = str(response2.content.decode())
+    print(type(peer_public_key))
+    print(type(response2.content))
+    print(response2.content)'''
 
 message = ""
 client = Client()

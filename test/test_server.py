@@ -31,17 +31,17 @@ with open("server_keys.json") as f:
 cpackets[0].client_prep_up(keys)
 cpackets[1].client_prep_up(keys)
 
-print(f"prior to collects round:{serv._current_round} state:{serv.mode}")
+print(f"prior to collects round:{serv.current_round} state:{serv.mode}")
 
 serv.collect_request(b"0", cpackets[0].send_out())
-print(f"between collects. round:{serv._current_round} state:{serv.mode}")
+print(f"between collects. round:{serv.current_round} state:{serv.mode}")
 serv.collect_request(b"1", cpackets[1].send_out())
-print(f"after collects. round:{serv._current_round} state:{serv.mode}")
+print(f"after collects. round:{serv.current_round} state:{serv.mode}")
 
 cpackets[0].client_prep_down(serv.return_request(b"0"))
-print(f"between collects. round:{serv._current_round} state:{serv.mode}")
+print(f"between collects. round:{serv.current_round} state:{serv.mode}")
 cpackets[1].client_prep_down(serv.return_request(b"1"))
-print(f"after collects. round:{serv._current_round} state:{serv.mode}")
+print(f"after collects. round:{serv.current_round} state:{serv.mode}")
 
 result0 = cpackets[0].send_out()
 result1 = cpackets[1].send_out()

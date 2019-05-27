@@ -6,10 +6,12 @@
 
 import os, sys, io, json, random
 from enum import Enum
+from collections import OrderedDict
 
 sys.path.append(os.path.abspath('../Kudu'))
 
 import lib.easy_crypto as ec
+import lib.payload as pl
 
 class Server:
     class Modes(Enum):
@@ -17,71 +19,132 @@ class Server:
         PROCESSING = 2
         DISTRIBUTING = 3
 
-    def __init__(self, client_count=0, server_count=3):
-        self.client_count = client_count
-        self._rsa_key = ec.generate_rsa()
+    def __init__(self, client_count=2, server_count=5):
+        self.CLIENT_COUNT = client_count
+        self.SERVER_COUNT = server_count
 
-        self.current_round = 0
+        # vector of server keys
+        self._keys = [ec.generate_rsa() for _ in range(self.SERVER_COUNT)]
+        with open("server_keys.json", "w") as f: # export keys for use by clients (test without dispatch)
+            f.write(json.dumps(self._get_privates()))
+
+        self._current_round = 0
         self.mode = Server.Modes.RECEIVING
 
-        self.deaddrops = {}
-        self.packets = set()
+        self._id_map = OrderedDict() # {id: data}
+        self._responses = None # {id: deaddrop_result}
 
-        self.bundle = None
+        # TODO: refactor out
+        self._bundles = None # representation of each servers internal state
 
-        
+    def _get_privates(self):
+        return [ec.export_rsa_public(k).decode() for k in self._keys]
 
     def reset(self):
         if self.mode != Server.Modes.DISTRIBUTING:
             raise ValueError("not ready to reset")
 
-        self.current_round += 1
+        self._current_round += 1
         self.mode = Server.Modes.RECEIVING
 
-        self.deaddrops = {}
-        self.packets = set()
+        self._id_map = OrderedDict()
+        self._responses = None
 
-        self.bundle = None
+        self._bundles = None # regenerate each round
 
     # handles
     def collect_request(self, id, data):
         if self.mode != Server.Modes.RECEIVING:
             raise ValueError("not ready to receive")
+        elif id in self._id_map:
+            raise ValueError(f"already recieved a submission this round by id:{id}")
 
-        self.packets.add(Packet(data=data, origin=True, caller_id=id))
+        self._id_map[id] = data
 
         # if all expected are received, process them in
-        if len(self.packets) == self.client_count:
+        if len(self._id_map) == self.CLIENT_COUNT:
             self.mode = Server.Modes.PROCESSING
-            self.process_requests()
+            self._process_requests()
 
 
-    def process_requests(self):
+    def _process_requests(self):
         if self.mode != Server.Modes.PROCESSING:
-            raise ValueError("not ready to process")
-        elif self.bundle:
-            raise ValueError("not ready to process")
+            raise ValueError(f"not ready to process: in state {self.mode}")
+        elif self._bundles:
+            raise ValueError("bundles already exist; can't process")
+
+        self._bundles = [Bundle() for _ in range(self.SERVER_COUNT)]
+
+        rsa_priv_keys = [k.export_key() for k in self._keys]
+
+        # sequentially process up
+        prev_up = list(self._id_map.values()) # initial is direct from client: final is terminal's decrypted
+        for b, pk in zip(self._bundles, rsa_priv_keys):
+            b.load_up(prev_up)
+            prev_up = b.send_up(pk)
+
+        terminal_raws = prev_up
+
+        prev_down = self._terminal_process(terminal_raws)
+
+        for b in reversed(self._bundles): # go in the opposite direction now
+            b.load_down(prev_down)
+            prev_down = b.send_down()
+        
+        self._responses = {id: resp for id, resp in zip(self._id_map.keys(), prev_down)}
 
         self.mode = Server.Modes.DISTRIBUTING
+
+    # given the raw decrypts, runs the deaddrops
+    def _terminal_process(self, raws):
+        processed = []
+
+        # process each
+        for r in raws:
+            try:
+                contents = pl.import_payload(r)
+            except KeyError: # invalid upload
+                contents = None
+            
+            processed.append(contents)
+
+        deaddrops = {}
+
+        # fill deaddrops
+        for p in processed:
+            if p:
+                deaddrops[p.drop] = p.message
+
+        results = []
+        # now collect from them
+        for p in processed:
+            try:
+                collected = deaddrops[p.collect] if p else None 
+            except KeyError:
+                collected = "INVALID_REQUEST".encode()          
+            results.append(collected)
+
+        # TODO: handle invalids betters
+
+        return results
+        
 
     def return_request(self, id):
         if self.mode != Server.Modes.DISTRIBUTING:
             raise ValueError("not ready to distribute")
-        elif id not in self.packets:
-            raise ValueError("no such id was received")
+        elif id not in self._id_map:
+            raise ValueError(f"no such id:{id} was received")
 
-        requested_drop = self.packets[id].contents.collect
-        result = self.deaddrops.pop(requested_drop)
+        result = self._responses.pop(id)
 
-
-        if len(self.deaddrops) == 0: # exit distribute mode and return to recieving
+        if len(self._responses) == 0: # exit distribute mode and return to recieving
             self.reset()
 
         return result
 
-    def get_public_key(self):
-        """Returns this server's public RSA key."""
-        return ec.export_rsa_public(self._rsa_key)
+    # def get_public_key(self):
+    #     """Returns this server's public RSA key."""
+    #     return ec.export_rsa_public(self._rsa_key)
 
 class Packet:
     def __init__(self):

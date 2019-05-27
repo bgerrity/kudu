@@ -29,6 +29,11 @@ app = Flask(__name__)
 keys = Dispatch()
 server_lock = Lock() # general purpose lock
 
+@app.route("/increment_users", methods=['POST'])
+def increment_users():
+    keys.num_clients = keys.num_clients + 1
+
+    return f"incremented", HTTPStatus.ACCEPTED
 
 @app.route("/publish_DH_key/<int:id>", methods=['POST'])
 def publish_DH_key(id):
@@ -67,7 +72,6 @@ def publish_key(id):
     key = request.data
     with server_lock:
         keys.public_keys[id] = key
-        keys.num_clients = keys.num_clients + 1
 
     return f"Received key from {id}", HTTPStatus.ACCEPTED
 

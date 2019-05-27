@@ -2,10 +2,18 @@
 # easy_crypto.py
 
 import sys, io
+from sys import platform
 
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Random import get_random_bytes
-from Cryptodome.Cipher import AES, PKCS1_OAEP
+if platform == "linux":
+    from Cryptodome.PublicKey import RSA
+    from Cryptodome.Random import get_random_bytes
+    from Cryptodome.Cipher import AES, PKCS1_OAEP
+elif platform == "darwin":
+    from Crypto.PublicKey import RSA
+    from Crypto.Random import get_random_bytes
+    from Crypto.Cipher import AES, PKCS1_OAEP
+else: # e.g. platform == "win32":
+    raise NotImplementedError(f"no support for sys.platform:{platform}")
 
 import pyDHE
 

@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-# easy_crypto.py
+# lib/easy_crypto.py
 
 import sys, io
 from sys import platform

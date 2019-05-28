@@ -2,15 +2,13 @@
 
 # app.py
 
-from flask import Flask, Response, request, redirect, jsonify
+from flask import Flask, Response, request
 
 from sys import argv
 from http import HTTPStatus
-from collections import deque
 from threading import Lock
 
 from server import Server # hacky.db interface
-from packet import Packet
 
 app = Flask(__name__)
 
@@ -31,11 +29,9 @@ def hello():
 # stores uploaded packet
 @app.route('/submission/<int:id>', methods=['POST'])
 def post_submission(id):
-    packet = Packet(request.data, terminal=True)
-
     with server_lock:
         if db.mode == db.Modes.RECEIVING:
-            db.collect_request(id, packet)
+            db.collect_request(id, request.data)
         else:
             return f"Server not receiving", HTTPStatus.BAD_REQUEST
 
@@ -52,19 +48,16 @@ def get_response(id):
     with server_lock:
         if db.mode != db.Modes.DISTRIBUTING:
             return "Server not distributing", HTTPStatus.BAD_REQUEST
-        elif id not in db.packets:
+        elif id not in db._id_map:
             return f"No request by id:{id}", HTTPStatus.BAD_REQUEST
 
         try:
-            response = {
-                "round": db.current_round,
-                "collected": collect_drop(id)
-            }
+            response = collect_drop(id)
         except KeyError:
             return f"Already returned id:{id}", HTTPStatus.BAD_REQUEST
 
 
-    return jsonify(response)
+    return Response(response)
 
 # given an id, services its requested drop
 # assumes server lock is owned by thread

@@ -1,3 +1,6 @@
+#! /usr/bin/env python3
+# lib/payload.py
+
 import io
 from collections import namedtuple
 

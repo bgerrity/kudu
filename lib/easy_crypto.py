@@ -1,10 +1,21 @@
 #! /usr/bin/env python3
-# easy_crypto.py
+# lib/easy_crypto.py
 
-from Crypto.PublicKey import RSA
-from Crypto.Random import get_random_bytes
-from Crypto.Cipher import AES, PKCS1_OAEP
-import io
+import sys, io
+from sys import platform
+
+if platform == "linux":
+    from Cryptodome.PublicKey import RSA
+    from Cryptodome.Random import get_random_bytes
+    from Cryptodome.Cipher import AES, PKCS1_OAEP
+elif platform == "darwin":
+    from Crypto.PublicKey import RSA
+    from Crypto.Random import get_random_bytes
+    from Crypto.Cipher import AES, PKCS1_OAEP
+else: # e.g. platform == "win32":
+    raise NotImplementedError(f"no support for sys.platform:{platform}")
+
+import pyDHE
 
 # shamelessly stolen from https://pycryptodome.readthedocs.io/en/latest/src/examples.html
 
@@ -121,6 +132,33 @@ def decrypt_aes(data, key):
 
     return plaintext
 
+def generate_dh():
+    """Generates a DHE object (private)."""
+    private_key = pyDHE.new()
+    return private_key
+
+def export_dh_public(client_private_key):
+    """Given a DHE object, returns a (portable) bytes public key."""
+    if not isinstance(client_private_key, pyDHE.DHE):
+        raise ValueError("param @client_private_key must be of type pyDHE.DHE")
+
+    public_key = client_private_key.getPublicKey()
+    return public_key.to_bytes(256, byteorder=sys.byteorder)
+
+def generate_dh_shared_secret(client_private_key, peer_public_key):
+    """
+    Given a DHE private object and a bytes public key,
+    generates and returns a bytes shared secret.
+    """
+    if not isinstance(client_private_key, pyDHE.DHE):
+        raise ValueError("param @peer_public_key must be type PyDHE")
+    if not isinstance(peer_public_key, bytes):
+        raise ValueError("param @client_private_key must be of type bytes")
+
+    shared_key = client_private_key.update(int.from_bytes(peer_public_key, byteorder=sys.byteorder))
+
+    return shared_key.to_bytes(256, byteorder=sys.byteorder)
+
 # TESTING SCRIPT
 if __name__ == '__main__':
     rsa_plain = "life is like a box of chocolates".encode("utf-8")
@@ -143,5 +181,19 @@ if __name__ == '__main__':
     aes_encrypted = encrypt_aes(aes_plain, aes_key)
     aes_decrypted = decrypt_aes(aes_encrypted, aes_key)
 
-
     print(aes_decrypted.decode("utf-8"))
+
+    # Diffie Hellman testing
+    a_private = generate_dh()
+    b_private = generate_dh()
+
+    a_public = export_dh_public(a_private)
+    b_public = export_dh_public(b_private)
+
+    a_shared = generate_dh_shared_secret(a_private, b_public)
+    b_shared = generate_dh_shared_secret(b_private, a_public)
+
+    if a_shared == b_shared:
+        print("DH derived same number")
+    else:
+        print("DH failed")

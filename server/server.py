@@ -91,7 +91,7 @@ class Server:
         for b in reversed(self._bundles): # go in the opposite direction now
             b.load_down(prev_down)
             prev_down = b.send_down()
-        
+
         self._responses = {id: resp for id, resp in zip(self._id_map.keys(), prev_down)}
 
         self.mode = Server.Modes.DISTRIBUTING
@@ -106,7 +106,7 @@ class Server:
                 contents = pl.import_payload(r)
             except KeyError: # invalid upload
                 contents = None
-            
+
             processed.append(contents)
 
         deaddrops = {}
@@ -120,15 +120,15 @@ class Server:
         # now collect from them
         for p in processed:
             try:
-                collected = deaddrops[p.collect] if p else None 
+                collected = deaddrops[p.collect] if p else None
             except KeyError:
-                collected = "INVALID_REQUEST".encode()          
+                collected = "INVALID_REQUEST".encode()
             results.append(collected)
 
         # TODO: handle invalids betters
 
         return results
-        
+
 
     def return_request(self, id):
         if self.mode != Server.Modes.DISTRIBUTING:
@@ -169,7 +169,7 @@ class Packet:
         elif self._inbox:
             raise ValueError("already loaded")
         self._inbox = data
-    
+
     def load_down(self, data):
         if not isinstance(data, bytes):
             raise ValueError("data is invalid type")
@@ -269,7 +269,7 @@ class Bundle:
         for p in self.packets:
             p.onion_peel_layer(private_key)
         self._forward_shuffle_packets()
-        
+
         upbound = [p.send_out() for p in self.packets]
         return upbound
 
@@ -278,7 +278,7 @@ class Bundle:
         for p in self.packets:
             p.onion_add_layer()
         self._reverse_shuffle_packets()
-        
+
         downbound = [p.send_out() for p in self.packets]
         self.packets = []
         return downbound

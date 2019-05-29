@@ -53,7 +53,7 @@ def get_DH_key(id):
     except KeyError:
         return f"No_Key", HTTPStatus.BAD_REQUEST
 
-    return f"{partner_key}", HTTPStatus.ACCEPTED
+    return partner_key, HTTPStatus.ACCEPTED
 
 # dispatch server port
 @app.route("/dispatch_port", methods=['GET'])
@@ -85,7 +85,7 @@ def get_key(id):
     except KeyError:
         return f"No_Key", HTTPStatus.BAD_REQUEST
 
-    return f"{partner_key}", HTTPStatus.ACCEPTED
+    return partner_key, HTTPStatus.ACCEPTED
 
 if __name__ == '__main__':
     port = 5000

@@ -3,11 +3,13 @@
 from Cryptodome.Cipher import AES, PKCS1_OAEP
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Random import get_random_bytes
-from lib import easy_crypto as ec
 from http import HTTPStatus
-import requests
-import sys
-import time
+import requests, os, sys, time
+
+sys.path.append(os.path.abspath('../Kudu'))
+
+from lib import easy_crypto as ec
+
 
 class Client:
     def __init__(self): # TODO: args
@@ -24,7 +26,7 @@ class Client:
 
 
     def generate_DH(self):
-        private_key = ec.DH_generate_private_key()
+        private_key = ec.generate_dh()
         return private_key
 
     # generate pair of keys for this client
@@ -91,7 +93,7 @@ def postKeys():
     if response2.status_code == HTTPStatus.ACCEPTED:
         print("Public DH Key posted")
 
-    # when done with posting keys increments the number of users 
+    # when done with posting keys increments the number of users
     response3 = requests.post('http://127.0.0.1:5000/increment_users')
     if response3.status_code == HTTPStatus.ACCEPTED:
         print("Client finished posting")
@@ -117,8 +119,8 @@ def getKeys():
 message = ""
 client = Client()
 print("Client ", client.id, "partner ", client.partner)
-postKeys()
-getKeys()
+#postKeys()
+#getKeys()
 
 
 while message != "Quit":

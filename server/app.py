@@ -16,11 +16,7 @@ dispatch_port = None
 
 server_lock = Lock() # general purpose lock
 
-db = Server(2)
-
-# holds the tuples of the server chain crypt keys (public, private)
-# ordered from origin to deaddrop (TODO: bettter phrasing?)
-chain_keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
+db = Server(2) # TODO: parameterize
 
 @app.route("/")
 def hello():
@@ -64,6 +60,7 @@ def get_response(id):
 def collect_drop(id):
     return db.return_request(id)
 
+# TODO: better processing
 if __name__ == '__main__':
     port = 5001
     dispatch_port = 5000

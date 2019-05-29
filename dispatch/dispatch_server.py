@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+# server/dispatch_server.py
 
 #
 # Serves as CDN analogue for dialing.
@@ -12,81 +13,118 @@
 # . venv/bin/activate
 
 from flask import Flask, Response, request, redirect, jsonify
-import subprocess
-import time
-import sys
+import sys, time
+from sys import argv
 from http import HTTPStatus
 from threading import Lock
 
-class Dispatch:
-    def __init__(self):
-        self.num_clients = 0
-        # dictionary that will hold all public keys
-        self.public_keys = {}
-        self.DH_pub_keys = {}
 
 app = Flask(__name__)
-keys = Dispatch()
+
+expected_clients = None
+server_port = None # the
+
 server_lock = Lock() # general purpose lock
 
-@app.route("/increment_users", methods=['POST'])
-def increment_users():
-    keys.num_clients = keys.num_clients + 1
+# id of users -- required before any other operations
+registered_ids = set()
 
-    return f"incremented", HTTPStatus.ACCEPTED
+# public keys of clients
+public_keys_rsa = {}
+public_keys_dh = {}
 
-@app.route("/publish_DH_key/<int:id>", methods=['POST'])
-def publish_DH_key(id):
-    key = request.data
+@app.route("/register_id/<int:id>", methods=['POST'])
+def register_id(id):
     with server_lock:
-        keys.DH_pub_keys[id] = key
+        if len(registered_ids) >= expected_clients:
+            return f"registered id count cap:{expected_clients} reached", HTTPStatus.CONFLICT
+        if id in registered_ids:
+            return f"id:{id} already registered", HTTPStatus.CONFLICT
 
-    return f"Received DH key from {id}", HTTPStatus.ACCEPTED
+        registered_ids.add(id)
 
-@app.route("/get_DH_key/<int:id>", methods=["GET"])
-def get_DH_key(id):
-    if keys.num_clients != 2:
-        return f"Wait", HTTPStatus.PROCESSING
+    return f"registered id:{id} ({len(registered_ids)} for {expected_clients})"
 
-    try:
-        partner_key = keys.DH_pub_keys[id]
-    except KeyError:
-        return f"No_Key", HTTPStatus.BAD_REQUEST
-
-    return partner_key, HTTPStatus.ACCEPTED
-
-# dispatch server port
-@app.route("/dispatch_port", methods=['GET'])
-def get_port():
-    return f"5000", HTTPStatus.ACCEPTED
-
-# vuvuzela server port
-@app.route("/server_port", methods=['GET'])
-def get_servr_port():
-    return f"5001", HTTPStatus.ACCEPTED
-
-# id will be the id that a client will hold
-# so when making a call to this the client will give it's id and public key
-@app.route("/publish_key/<int:id>", methods=['POST'])
-def publish_key(id):
-    key = request.data
+@app.route("/registered/", methods=['GET'])
+def registered():
     with server_lock:
-        keys.public_keys[id] = key
+        return jsonify(list(registered_ids))
 
-    return f"Received key from {id}", HTTPStatus.ACCEPTED
+@app.route("/publish_dh_key/<int:id>", methods=['POST'])
+def publish_dh_key(id):
+    with server_lock:
+        if id not in registered_ids:
+            return f"id:{id} not registered", HTTPStatus.CONFLICT
+        if id in public_keys_dh:
+            return f"id:{id} already published dh key", HTTPStatus.CONFLICT
 
-@app.route("/get_key/<int:id>", methods=['GET'])
-def get_key(id):
-    if keys.num_clients != 2:
-        return f"Wait", HTTPStatus.PROCESSING
+        key = request.data
+        public_keys_dh[id] = key
 
-    try:
-        partner_key = keys.public_keys[id]
-    except KeyError:
-        return f"No_Key", HTTPStatus.BAD_REQUEST
+    return f"received DH key from id:{id}"
 
-    return partner_key, HTTPStatus.ACCEPTED
+@app.route("/retrieve_dh_key/<int:id>", methods=['GET'])
+def retrieve_dh_key(id):
+    with server_lock:
+        if id not in registered_ids:
+            return f"id:{id} not registered", HTTPStatus.NOT_FOUND
+        if id not in public_keys_dh:
+            return f"id:{id} registered but dh key not available", HTTPStatus.NOT_FOUND
+
+        key = public_keys_dh[id]
+
+    return key
+
+@app.route("/publish_rsa_key/<int:id>", methods=['POST'])
+def publish_rsa_key(id):
+    with server_lock:
+        if id not in registered_ids:
+            return f"id:{id} not registered", HTTPStatus.CONFLICT
+        if id in public_keys_rsa:
+            return f"id:{id} already published rsa key", HTTPStatus.CONFLICT
+
+        key = request.data
+        public_keys_rsa[id] = key
+
+    return f"received RSA key from id:{id}"
+
+@app.route("/retrieve_rsa_key/<int:id>", methods=['GET'])
+def retrieve_rsa_key(id):
+    with server_lock:
+        if id not in registered_ids:
+            return f"id:{id} not registered", HTTPStatus.NOT_FOUND
+        if id not in public_keys_rsa:
+            return f"id:{id} registered but rsa key not available", HTTPStatus.NOT_FOUND
+
+        key = public_keys_rsa[id]
+
+    return key
+
+@app.route("/get_server_port", methods=['GET'])
+def get_server_port():
+    return server_port
 
 if __name__ == '__main__':
     port = 5000
+    server_port = 5001
+    expected_clients = 2
+
+    try:
+        port = int(argv[1])
+    except (ValueError, IndexError):
+        pass
+    try:
+        server_port = int(argv[2])
+    except (ValueError, IndexError):
+        pass
+    try:
+        client_count = int(argv[3])
+    except (ValueError, IndexError):
+        pass
+    try:
+        expected_clients = int(argv[4])
+    except (ValueError, IndexError):
+        pass
+
     app.run(debug=True, port=port)
+

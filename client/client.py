@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+# client/client.py
 
 from http import HTTPStatus
 import requests
@@ -13,6 +14,7 @@ import lib.payload as pl
 from packet import Packet
 
 dispatch_port = None
+server_port = None
 
 self_id = None
 partner_id = None
@@ -32,19 +34,19 @@ def setup():
 
     response = requests.post(f"http://localhost:{dispatch_port}/register_id/{self_id}")
     if response.status_code != HTTPStatus.OK:
+        print(response, response.txt, file=sys.stderr)
         exit("unable to register with dispatch")
-    # print(response.text)
-
     
     dh_public = ec.export_dh_public(key_dh)
     response = requests.post(f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}", data=dh_public)
     if response.status_code != HTTPStatus.OK:
+        print(response, response.txt, file=sys.stderr)
         exit("unable to post dh key with dispatch")
-    # print(response.text)
 
     rsa_public = ec.export_rsa_public(key_rsa)
     response = requests.post(f"http://localhost:{dispatch_port}/publish_rsa_key/{self_id}", data=rsa_public)
     if response.status_code != HTTPStatus.OK:
+        print(response, response.txt, file=sys.stderr)
         exit("unable to post rsa key with dispatch")
 
     print(f"Completed posting id:{self_id}.")
@@ -79,9 +81,6 @@ def message_loop():
 
         send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round)
         recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round)
-        print("send:", send_addr)
-        print("recv:", recv_addr)
-
  
         # conversant
         payload = pl.Payload(send_addr, recv_addr, message.ljust(512).encode())
@@ -94,17 +93,16 @@ def message_loop():
 
         packet.client_prep_up(keys)
 
-        requests.post(f"http://localhost:5001/submission/{self_id}", data=packet.send_out())
+        requests.post(f"http://localhost:{5001}/submission/{self_id}", data=packet.send_out())
 
         # busy wait
 
         response = requests.get(f"http://localhost:5001/deaddrop/{self_id}")
 
         while response.status_code != HTTPStatus.OK:
-            time.sleep(2)
+            time.sleep(4)
             print("waiting for server")
             response = requests.get(f"http://localhost:5001/deaddrop/{self_id}")
-            print(response)
 
         packet.client_prep_down(response.content)
 
@@ -121,86 +119,13 @@ def deaddrop_address(shared, sender_id, recipient_id, round):
 
 if __name__ == "__main__":
     dispatch_port = sys.argv[1]
-    self_id = sys.argv[2]
-    partner_id = sys.argv[3]
+    server_port = sys.argv[2]
+
+    self_id = sys.argv[3]
+    partner_id = sys.argv[4]
 
     key_rsa = ec.generate_rsa()
     DH_key = ec.generate_dh()
 
     setup()
     message_loop()
-
-
-
-
-# class Client:
-#     def __init__(self):
-
-#     # query dispatch for its partner (may be none)
-#     def get_partner_keys(self):
-#         return 0 # TODO this might change
-
-#     # query user for message to send
-#     def collect_message(self):
-#         raise NotImplementedError
-
-#     # instantiate round struct
-#     def create_round(self):
-#         raise NotImplementedError
-
-#     # instantiate noise message
-#     def create_round_noise(self):
-#         raise NotImplementedError
-
-#     # send up to server
-#     def send_round(self):
-#         raise NotImplementedError
-
-#     # collect server
-#     def collect_round(self):
-#         raise NotImplementedError
-
-#     # wrappers for openssl
-#     def encrypt(self):
-#         raise NotImplementedError
-
-#     def decrypt(self):
-#         raise NotImplementedError
-
-
-# def postKeys():
-#     # posts the public RSA key to the server
-#     response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
-#     if response.status_code == HTTPStatus.ACCEPTED:
-#         print("Public Key posted")
-
-#     # posts the diffie hellman public key to the server
-#     # TODO change DH_public according to the new return value in easy_crypto
-#     DH_public = str(client.DH_key.getPublicKey()).encode()
-#     response2 = requests.post('http://127.0.0.1:5000/publish_DH_key/'+ client.id, data = DH_public)
-#     if response2.status_code == HTTPStatus.ACCEPTED:
-#         print("Public DH Key posted")
-
-#     # when done with posting keys increments the number of users
-#     response3 = requests.post('http://127.0.0.1:5000/increment_users')
-#     if response3.status_code == HTTPStatus.ACCEPTED:
-#         print("Client finished posting")
-
-# def getKeys():
-#     response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
-#     while(response.status_code != HTTPStatus.ACCEPTED):
-#         time.sleep(1)
-#         response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
-
-#     client.partner_key = RSA.import_key(response.content.decode())
-#     print("Imported partner's key")
-
-#     response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
-#     while(response2.status_code != HTTPStatus.ACCEPTED):
-#         time.sleep(1)
-#         response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
-
-#     # TODO still broken for the DH key
-#     DH_pub = int(response2.content.decode())
-#     client.shared_secret = client.DH_key.update(DH_pub)
-#     print("Generated shared secret")

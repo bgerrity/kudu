@@ -17,6 +17,7 @@ class Client:
         self.keys = self.generate_key(1) # [ ( private, public ) ]
         self.partner = sys.argv[2]
         self.DH_key = self.generate_DH()
+        self.DH_partner_key = None
         self.partner_key = None
         self.shared_secret = None
 
@@ -81,15 +82,13 @@ class Client:
 
 def postKeys():
     # posts the public RSA key to the server
-    print(type(client.keys[1]))
-    print(client.keys[1])
     response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
     if response.status_code == HTTPStatus.ACCEPTED:
         print("Public Key posted")
 
     # posts the diffie hellman public key to the server
     # TODO change DH_public according to the new return value in easy_crypto
-    DH_public = ec.export_dh_public(client.DH_key)
+    DH_public = str(client.DH_key.getPublicKey()).encode()
     response2 = requests.post('http://127.0.0.1:5000/publish_DH_key/'+ client.id, data = DH_public)
     if response2.status_code == HTTPStatus.ACCEPTED:
         print("Public DH Key posted")
@@ -106,6 +105,7 @@ def getKeys():
         response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
 
     client.partner_key = RSA.import_key(response.content.decode())
+    print("Imported partner's key")
 
     response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
     while(response2.status_code != HTTPStatus.ACCEPTED):
@@ -113,8 +113,9 @@ def getKeys():
         response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
 
     # TODO still broken for the DH key
-    print(type(response2.content))
-    print(response2.content)
+    DH_pub = int(response2.content.decode())
+    client.shared_secret = client.DH_key.update(DH_pub)
+    print("Generated shared secret")
 
 
 message = ""

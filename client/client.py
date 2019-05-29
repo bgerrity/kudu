@@ -75,7 +75,7 @@ def setup():
 def message_loop():
     while True:
         curr_round = requests.get("http://localhost:5001/current_round").text
-        message = input(f"ID:{self_id} Round:{partner_id} Message $> ")
+        message = input(f"ID:{self_id} Round:{curr_round} Message $> ")
         
         packet = Packet()
 

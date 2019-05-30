@@ -14,6 +14,8 @@ app = Flask(__name__)
 expected_clients = None
 server_port = None
 
+server_keys = None
+
 server_lock = Lock() # general purpose lock
 
 # id of users -- required before any other operations
@@ -93,6 +95,27 @@ def retrieve_rsa_key(id):
 @app.route("/get_server_port", methods=['GET'])
 def get_server_port():
     return server_port
+
+@app.route("/publish_server_keys", methods=['POST'])
+def publish_server_keys():
+    with server_lock:
+        global server_keys
+        if server_keys:
+            return f"server_keys already published", HTTPStatus.CONFLICT
+        
+        server_keys = request.data
+
+    return f"server_keys posted"
+
+@app.route("/retrieve_server_keys", methods=['GET'])
+def retrieve_server_keys():
+    with server_lock:
+        if not server_keys:
+            return f"not available", HTTPStatus.CONFLICT
+        
+        keys = server_keys
+
+    return keys
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Launch the dispatch manager.')

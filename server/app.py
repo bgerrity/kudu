@@ -1,8 +1,10 @@
 #! /usr/bin/env python3
+# server/app.py
 
-# app.py
+import argparse, json
 
 from flask import Flask, Response, request
+import requests
 
 from sys import argv
 from http import HTTPStatus
@@ -13,14 +15,11 @@ from server import Server # hacky.db interface
 app = Flask(__name__)
 
 dispatch_port = None
+client_count = None
 
 server_lock = Lock() # general purpose lock
 
-db = Server(2)
-
-# holds the tuples of the server chain crypt keys (public, private)
-# ordered from origin to deaddrop (TODO: bettter phrasing?)
-chain_keys = [("foo", "bar"), ("titi", "toto"), ("biz", "baz")]
+db = None
 
 @app.route("/")
 def hello():
@@ -65,16 +64,28 @@ def collect_drop(id):
     return db.return_request(id)
 
 if __name__ == '__main__':
-    port = 5001
-    dispatch_port = 5000
+    parser = argparse.ArgumentParser(description='Launch the Vuvuzela server.')
+    parser.add_argument("client_count", type=int, help="the number of clients")
+    parser.add_argument("-d", "--dispatch-port", type=int, default=5000,
+        help="the port for the dispatch server")
+    parser.add_argument("-s", "--server-port", type=int, default=5001,
+        help="the port for this Vuvuzela server")
 
-    try:
-        port = int(argv[1])
-    except (ValueError, IndexError):
-        pass
-    try:
-        dispatch_port = int(argv[2])
-    except (ValueError, IndexError):
-        pass
+    args = parser.parse_args()
+
+    client_count = args.client_count
+    port = args.server_port
+    dispatch_port = args.dispatch_port
+
+    db = Server(client_count) # state manager
+
+    # publish keys to dispatch for use by clients
+
+    key_data = json.dumps(db._get_privates())
+    url = f"http://localhost:{dispatch_port}/publish_server_keys"
+    response = requests.post(url, data=key_data)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text)
+        exit("server unable to publish keys to dispatch")
 
     app.run(debug=True, port=port)

@@ -1,129 +1,173 @@
 #! /usr/bin/env python3
+# client/client.py
 
-from Cryptodome.Cipher import AES, PKCS1_OAEP
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Random import get_random_bytes
 from http import HTTPStatus
-import requests, os, sys, time
+from threading import Lock
+
+import requests
+
+import os, sys, time, json, argparse
 
 sys.path.append(os.path.abspath('../Kudu'))
 
-from lib import easy_crypto as ec
+import lib.easy_crypto as ec
+import lib.payload as pl
+
+from packet import Packet
+
+dispatch_port = None
+server_port = None
+
+self_id = None
+partner_id = None
+
+key_rsa = ec.generate_rsa()
+key_dh = ec.generate_dh()
+
+partner_rsa_key = None
+shared_secret = None
+
+server_keys = None
+
+queue_lock = Lock()
+
+def setup():
+    """Handle one-time ops with dispatch for client."""
+
+    url = f"http://localhost:{dispatch_port}/retrieve_server_keys"
+    response = requests.get(url)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text, file=sys.stderr)
+        exit("unable to collect server keys from dispatch")
+
+    global server_keys
+    server_keys = [k.encode() for k in json.loads(response.content)]
+
+    # post own keys
+
+    url = f"http://localhost:{dispatch_port}/register_id/{self_id}"
+    response = requests.post(url)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text, file=sys.stderr)
+        exit("unable to register with dispatch")
+    
+    dh_public = ec.export_dh_public(key_dh)
+    url = f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}"
+    response = requests.post(url, data=dh_public)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text, file=sys.stderr)
+        exit("unable to post dh key with dispatch")
+
+    rsa_public = ec.export_rsa_public(key_rsa)
+    url = f"http://localhost:{dispatch_port}/publish_rsa_key/{self_id}"
+    response = requests.post(url, data=rsa_public)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text, file=sys.stderr)
+        exit("unable to post rsa key with dispatch")
+
+    print(f"Completed posting id:{self_id}.")
+    time.sleep(1)
+
+    # get partner's keys
+
+    url = f"http://localhost:{dispatch_port}/retrieve_dh_key/{partner_id}"
+    response = requests.get(url)
+    while response.status_code != HTTPStatus.OK:
+        time.sleep(2)
+        print(f"Waiting for availability of partner_id:{partner_id} dh key.")
+        response = requests.get(url)
+
+    partner_dh_key = response.content
+    shared_secret = ec.generate_dh_shared_secret(key_dh, partner_dh_key) # store shared
+
+    response = requests.get(url)
+    url = f"http://localhost:{dispatch_port}/retrieve_rsa_key/{partner_id}"
+    while response.status_code != HTTPStatus.OK:
+        time.sleep(2)
+        print(f"Waiting for availability of partner_id:{partner_id} rsa key.")
+        response = requests.get(url)
+
+    print(f"Collected partner:{partner_id} keys.")
 
 
-class Client:
-    def __init__(self): # TODO: args
-        self.id = sys.argv[1]
-        self.keys = self.generate_key(1) # [ ( private, public ) ]
-        self.partner = sys.argv[2]
-        self.DH_key = self.generate_DH()
-        self.DH_partner_key = None
-        self.partner_key = None
-        self.shared_secret = None
+def message_loop():
+    url = f"http://localhost:{server_port}/current_round"
+    curr_round = int(requests.get(url).text)
 
-    # listen-print-eval-loop
-    def listen(self):
-        raise NotImplementedError
+    while True:
+        message = None
+        while not message: # prompt until valid message
+            clear_send = input(f"ID:{self_id} Round:{curr_round} Message $> ")
+            try:
+                message = pl.construct_message(clear_send)
+            except (TypeError, ValueError, UnicodeEncodeError) as e:
+                message = None
+                print("Message invalid:", e)
+        
+        packet = Packet()
 
+        send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round) # drop
+        recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round) # collect
+ 
+        # conversant
+        payload = pl.Payload(send_addr, recv_addr, message)
+            
+        packet.payload = pl.export_payload(payload)
 
-    def generate_DH(self):
-        private_key = ec.generate_dh()
-        return private_key
+        packet.client_prep_up(server_keys)
 
-    # generate pair of keys for this client
-    def generate_key(self, count):
-        key = RSA.generate(2048)
-        private_key = key.export_key()
-        public_key = key.publickey().export_key()
-        return [private_key, public_key]
+        # send out message
+        url = f"http://localhost:{server_port}/submission/{self_id}"
+        requests.post(url, data=packet.send_out())
 
-    # query dispatch for its partner (may be none)
-    def get_partner(self):
-        return 0 # TODO this might change
+        # wait on response
+        url = f"http://localhost:{server_port}/deaddrop/{self_id}"
+        response = requests.get(url)
+        while response.status_code != HTTPStatus.OK:
+            time.sleep(4)
+            print("waiting for server")
+            response = requests.get(url)
 
-    # query user for message to send
-    def collect_message(self):
-        raise NotImplementedError
+        packet.client_prep_down(response.content)
 
-    # instantiate round struct
-    def create_round(self):
-        raise NotImplementedError
+        try:
+            message_recieved = pl.deconstruct_message(packet.send_out())
+        except (TypeError, ValueError, UnicodeDecodeError) as e:
+            message_recieved = f"RECEIVED INVALID: {e}"
 
-    # instantiate noise message
-    def create_round_noise(self):
-        raise NotImplementedError
+        print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved)
 
-    # send up to server
-    def send_round(self):
-        raise NotImplementedError
+        curr_round += 1
+    
+def deaddrop_address(shared, sender_id, recipient_id, round):
+    """
+    Generate the deaddrops for this round.
+    TODO: Make better -- actually hashing using shared etc
+        Use pl.ADDRESS_SIZE for address sizing
+    """
+    start = sender_id + recipient_id 
 
-    # collect server
-    def collect_round(self):
-        raise NotImplementedError
+    return start.ljust(256).encode()
 
-    # wrappers for openssl
-    def encrypt(self):
-        raise NotImplementedError
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Launch a client.')
+    parser.add_argument("self_id", help="the id for this client")
+    parser.add_argument("partner_id", help="the id for its conversation partner")
+    parser.add_argument("-d", "--dispatch-port", nargs=1, type=int, default=5000,
+        help="the port for the dispatch server")
+    parser.add_argument("-s", "--server-port", nargs=1, type=int, default=5001,
+        help="the port for the Vuvuzela server")
 
-    def decrypt(self):
-        raise NotImplementedError
+    args = parser.parse_args()
 
-'''def exchangeKeys():
-    response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
-    print(response.status_code)
+    dispatch_port = args.dispatch_port
+    server_port = args.server_port
 
-    if response.status_code == HTTPStatus.ACCEPTED:
-        print("Public Key posted")
+    self_id = args.self_id
+    partner_id = args.partner_id
 
-    response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
-    while(response2.status_code != HTTPStatus.ACCEPTED):
-        time.sleep(1)
-        response2 = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)'''
+    key_rsa = ec.generate_rsa()
+    key_dh = ec.generate_dh()
 
-def postKeys():
-    # posts the public RSA key to the server
-    response = requests.post('http://127.0.0.1:5000/publish_key/'+ client.id, data = client.keys[1])
-    if response.status_code == HTTPStatus.ACCEPTED:
-        print("Public Key posted")
-
-    # posts the diffie hellman public key to the server
-    # TODO change DH_public according to the new return value in easy_crypto
-    DH_public = str(client.DH_key.getPublicKey()).encode()
-    response2 = requests.post('http://127.0.0.1:5000/publish_DH_key/'+ client.id, data = DH_public)
-    if response2.status_code == HTTPStatus.ACCEPTED:
-        print("Public DH Key posted")
-
-    # when done with posting keys increments the number of users
-    response3 = requests.post('http://127.0.0.1:5000/increment_users')
-    if response3.status_code == HTTPStatus.ACCEPTED:
-        print("Client finished posting")
-
-def getKeys():
-    response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
-    while(response.status_code != HTTPStatus.ACCEPTED):
-        time.sleep(1)
-        response = requests.get('http://127.0.0.1:5000/get_key/' + client.partner)
-
-    client.partner_key = RSA.import_key(response.content.decode())
-    print("Imported partner's key")
-
-    response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
-    while(response2.status_code != HTTPStatus.ACCEPTED):
-        time.sleep(1)
-        response2 = requests.get('http://127.0.0.1:5000/get_DH_key/' + client.partner)
-
-    # TODO still broken for the DH key
-    DH_pub = int(response2.content.decode())
-    client.shared_secret = client.DH_key.update(DH_pub)
-    print("Generated shared secret")
-
-
-message = ""
-client = Client()
-print("Client ", client.id, "partner ", client.partner)
-postKeys()
-getKeys()
-
-
-while message != "Quit":
-    message = input("Enter message: ")
+    setup()
+    message_loop()

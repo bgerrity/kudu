@@ -4,7 +4,7 @@
 from http import HTTPStatus
 import requests
 
-import os, sys, time, json
+import os, sys, time, json, argparse
 
 sys.path.append(os.path.abspath('../Kudu'))
 
@@ -118,11 +118,21 @@ def deaddrop_address(shared, sender_id, recipient_id, round):
     return start.ljust(256).encode()
 
 if __name__ == "__main__":
-    dispatch_port = sys.argv[1]
-    server_port = sys.argv[2]
+    parser = argparse.ArgumentParser(description='Launch a client.')
+    parser.add_argument("self_id", help="the id for this client")
+    parser.add_argument("partner_id", help="the id for its conversation partner")
+    parser.add_argument("-d", "--dispatch-port", nargs=1, type=int, default=5000,
+        help="the port for the dispatch server")
+    parser.add_argument("-s", "--server-port", nargs=1, type=int, default=5001,
+        help="the port for the Vuvuzela server")
 
-    self_id = sys.argv[3]
-    partner_id = sys.argv[4]
+    args = parser.parse_args()
+
+    dispatch_port = args.dispatch_port
+    server_port = args.server_port
+
+    self_id = args.self_id
+    partner_id = args.partner_id
 
     key_rsa = ec.generate_rsa()
     DH_key = ec.generate_dh()

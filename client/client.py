@@ -135,7 +135,7 @@ if __name__ == "__main__":
     partner_id = args.partner_id
 
     key_rsa = ec.generate_rsa()
-    DH_key = ec.generate_dh()
+    key_dh = ec.generate_dh()
 
     setup()
     message_loop()

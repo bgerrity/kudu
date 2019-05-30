@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 # server/app.py
 
-import argparse
+import argparse, json
 
 from flask import Flask, Response, request
+import requests
 
 from sys import argv
 from http import HTTPStatus
@@ -77,4 +78,14 @@ if __name__ == '__main__':
     dispatch_port = args.dispatch_port
 
     db = Server(client_count) # state manager
+
+    # publish keys to dispatch for use by clients
+
+    key_data = json.dumps(db._get_privates())
+    url = f"http://localhost:{dispatch_port}/publish_server_keys"
+    response = requests.post(url, data=key_data)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text)
+        exit("server unable to publish keys to dispatch")
+
     app.run(debug=True, port=port)

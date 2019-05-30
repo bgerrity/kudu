@@ -100,10 +100,12 @@ def get_server_port():
 def publish_server_keys():
     with server_lock:
         global server_keys
-        if server_keys:
-            return f"server_keys already published", HTTPStatus.CONFLICT
         
         server_keys = request.data
+
+        if server_keys:
+            return f"server_keys replaced"
+
 
     return f"server_keys posted"
 

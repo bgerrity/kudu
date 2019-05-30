@@ -26,8 +26,6 @@ class Server:
 
         # vector of server keys
         self._keys = [ec.generate_rsa() for _ in range(self.SERVER_COUNT)]
-        with open("server_keys.json", "w") as f: # export keys for use by clients (test without dispatch) TODO: remove on merge with dispatch branch
-            f.write(json.dumps(self._get_privates()))
 
         self.current_round = 0
         self.mode = Server.Modes.RECEIVING

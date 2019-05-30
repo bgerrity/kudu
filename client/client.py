@@ -34,26 +34,35 @@ queue_lock = Lock()
 def setup():
     """Handle one-time ops with dispatch for client."""
 
+    url = f"http://localhost:{dispatch_port}/retrieve_server_keys"
+    response = requests.get(url)
+    if response.status_code != HTTPStatus.OK:
+        print(response, response.text, file=sys.stderr)
+        exit("unable to collect server keys from dispatch")
+
+    global server_keys
+    server_keys = [k.encode() for k in json.loads(response.content)]
+
     # post own keys
 
     url = f"http://localhost:{dispatch_port}/register_id/{self_id}"
     response = requests.post(url)
     if response.status_code != HTTPStatus.OK:
-        print(response, response.txt, file=sys.stderr)
+        print(response, response.text, file=sys.stderr)
         exit("unable to register with dispatch")
     
     dh_public = ec.export_dh_public(key_dh)
     url = f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}"
     response = requests.post(url, data=dh_public)
     if response.status_code != HTTPStatus.OK:
-        print(response, response.txt, file=sys.stderr)
+        print(response, response.text, file=sys.stderr)
         exit("unable to post dh key with dispatch")
 
     rsa_public = ec.export_rsa_public(key_rsa)
     url = f"http://localhost:{dispatch_port}/publish_rsa_key/{self_id}"
     response = requests.post(url, data=rsa_public)
     if response.status_code != HTTPStatus.OK:
-        print(response, response.txt, file=sys.stderr)
+        print(response, response.text, file=sys.stderr)
         exit("unable to post rsa key with dispatch")
 
     print(f"Completed posting id:{self_id}.")
@@ -105,10 +114,7 @@ def message_loop():
             
         packet.payload = pl.export_payload(payload)
 
-        with open("server_keys.json") as f:
-            keys = [k.encode() for k in json.loads(f.read())]
-
-        packet.client_prep_up(keys)
+        packet.client_prep_up(server_keys)
 
         # send out message
         url = f"http://localhost:{server_port}/submission/{self_id}"

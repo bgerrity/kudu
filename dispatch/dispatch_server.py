@@ -1,23 +1,13 @@
 #! /usr/bin/env python3
 # server/dispatch_server.py
 
-#
-# Serves as CDN analogue for dialing.
-# As the dialing protocol is unimplemented, for demonstration purposes, handles the distribution of
-# public keys to clients.
-#
-# For demonstration, used to bootstrap server and client processes.
-# Also provides standardization info to partipating processes (i.e. constraints and protocol specifications).
-#
-# README: Must be trusted for all purposes but CDN as Kudu lacks full implmentation.
-# . venv/bin/activate
+# TODO: moduel docstring
 
 from flask import Flask, Response, request, redirect, jsonify
-import sys, time
+import sys, time, argparse
 from sys import argv
 from http import HTTPStatus
 from threading import Lock
-
 
 app = Flask(__name__)
 
@@ -105,26 +95,18 @@ def get_server_port():
     return server_port
 
 if __name__ == '__main__':
-    port = 5000
-    server_port = 5001
-    expected_clients = 2
+    parser = argparse.ArgumentParser(description='Launch the dispatch manager.')
+    parser.add_argument("client_count", type=int, help="the number of clients")
+    parser.add_argument("-d", "--dispatch-port", type=int, default=5000,
+        help="the port for this dispatch server")
+    parser.add_argument("-s", "--server-port", type=int, default=5001,
+        help="the port for the Vuvuzela server")
 
-    try:
-        port = int(argv[1])
-    except (ValueError, IndexError):
-        pass
-    try:
-        server_port = int(argv[2])
-    except (ValueError, IndexError):
-        pass
-    try:
-        client_count = int(argv[3])
-    except (ValueError, IndexError):
-        pass
-    try:
-        expected_clients = int(argv[4])
-    except (ValueError, IndexError):
-        pass
+    args = parser.parse_args()
+
+    expected_clients = args.client_count
+    port = args.dispatch_port
+    server_port = args.server_port
 
     app.run(debug=True, port=port)
 

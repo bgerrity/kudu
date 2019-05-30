@@ -2,6 +2,8 @@
 # client/client.py
 
 from http import HTTPStatus
+from threading import Lock
+
 import requests
 
 import os, sys, time, json, argparse
@@ -27,24 +29,29 @@ shared_secret = None
 
 server_keys = None
 
+queue_lock = Lock()
+
 def setup():
     """Handle one-time ops with dispatch for client."""
 
-    # post of own keys
+    # post own keys
 
-    response = requests.post(f"http://localhost:{dispatch_port}/register_id/{self_id}")
+    url = f"http://localhost:{dispatch_port}/register_id/{self_id}"
+    response = requests.post(url)
     if response.status_code != HTTPStatus.OK:
         print(response, response.txt, file=sys.stderr)
         exit("unable to register with dispatch")
     
     dh_public = ec.export_dh_public(key_dh)
-    response = requests.post(f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}", data=dh_public)
+    url = f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}"
+    response = requests.post(url, data=dh_public)
     if response.status_code != HTTPStatus.OK:
         print(response, response.txt, file=sys.stderr)
         exit("unable to post dh key with dispatch")
 
     rsa_public = ec.export_rsa_public(key_rsa)
-    response = requests.post(f"http://localhost:{dispatch_port}/publish_rsa_key/{self_id}", data=rsa_public)
+    url = f"http://localhost:{dispatch_port}/publish_rsa_key/{self_id}"
+    response = requests.post(url, data=rsa_public)
     if response.status_code != HTTPStatus.OK:
         print(response, response.txt, file=sys.stderr)
         exit("unable to post rsa key with dispatch")
@@ -52,29 +59,33 @@ def setup():
     print(f"Completed posting id:{self_id}.")
     time.sleep(1)
 
-    # get of partner's keys
+    # get partner's keys
 
-    response = requests.get(f"http://localhost:{dispatch_port}/retrieve_dh_key/{partner_id}")
+    url = f"http://localhost:{dispatch_port}/retrieve_dh_key/{partner_id}"
+    response = requests.get(url)
     while response.status_code != HTTPStatus.OK:
         time.sleep(2)
         print(f"Waiting for availability of partner_id:{partner_id} dh key.")
-        response = requests.get(f"http://localhost:{dispatch_port}/retrieve_dh_key/{partner_id}")
+        response = requests.get(url)
 
     partner_dh_key = response.content
     shared_secret = ec.generate_dh_shared_secret(key_dh, partner_dh_key) # store shared
 
-    response = requests.get(f"http://localhost:{dispatch_port}/retrieve_rsa_key/{partner_id}")
+    response = requests.get(url)
+    url = f"http://localhost:{dispatch_port}/retrieve_rsa_key/{partner_id}"
     while response.status_code != HTTPStatus.OK:
         time.sleep(2)
         print(f"Waiting for availability of partner_id:{partner_id} rsa key.")
-        response = requests.get(f"http://localhost:{dispatch_port}/retrieve_rsa_key/{partner_id}")
+        response = requests.get(url)
 
     print(f"Collected partner:{partner_id} keys.")
 
 
 def message_loop():
+    url = f"http://localhost:{server_port}/current_round"
+    curr_round = int(requests.get(url).text)
+
     while True:
-        curr_round = requests.get("http://localhost:5001/current_round").text
         message = input(f"ID:{self_id} Round:{curr_round} Message $> ")
         
         packet = Packet()
@@ -93,20 +104,23 @@ def message_loop():
 
         packet.client_prep_up(keys)
 
-        requests.post(f"http://localhost:{5001}/submission/{self_id}", data=packet.send_out())
+        # send out message
+        url = f"http://localhost:{server_port}/submission/{self_id}"
+        requests.post(url, data=packet.send_out())
 
-        # busy wait
-
-        response = requests.get(f"http://localhost:5001/deaddrop/{self_id}")
-
+        # wait on response
+        url = f"http://localhost:{server_port}/deaddrop/{self_id}"
+        response = requests.get(url)
         while response.status_code != HTTPStatus.OK:
             time.sleep(4)
             print("waiting for server")
-            response = requests.get(f"http://localhost:5001/deaddrop/{self_id}")
+            response = requests.get(url)
 
         packet.client_prep_down(response.content)
 
         print(f"[{time.strftime('%a %H:%M:%S')}] {packet.send_out().decode().strip()}")
+
+        curr_round += 1
     
 def deaddrop_address(shared, sender_id, recipient_id, round):
     """

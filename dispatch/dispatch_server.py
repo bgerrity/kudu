@@ -12,7 +12,7 @@ from threading import Lock
 app = Flask(__name__)
 
 expected_clients = None
-server_port = None # the
+server_port = None
 
 server_lock = Lock() # general purpose lock
 

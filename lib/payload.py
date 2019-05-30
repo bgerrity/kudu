@@ -1,14 +1,80 @@
 #! /usr/bin/env python3
 # lib/payload.py
 
-import io
+import io, sys
 from collections import namedtuple
 
 # a standardized format for the 3-tuple used to interact with Vuvuzela servers and clients
 Payload = namedtuple("payload", ["collect", "drop", "message"])
 
 ADDRESS_SIZE = 256 # size of shared secret used by
-MESSAGE_SIZE = 512 # arbitrary size
+MESSAGE_SIZE = 256 # paper spec
+
+# initial bytes in message body to store information
+# [0]: message_text_lenght; [1-7]: unallocated
+MESSAGE_HEADER_SIZE = 8
+
+def construct_message(plain):
+    """
+    Given a plaintext string, validates as a message (length and content) and
+    returns as formatted message ready to payload.
+    """
+    if not isinstance(plain, str):
+        raise TypeError("plain must be of type str")
+    
+    try:
+        encoded = plain.encode("ascii")
+    except UnicodeEncodeError:
+        raise ValueError("plain must be exclusively ascii characters")
+
+    if len(encoded) > (MESSAGE_SIZE - MESSAGE_HEADER_SIZE):
+        raise ValueError(f"plain must be maximum {MESSAGE_SIZE - MESSAGE_HEADER_SIZE} chars got {len(encoded)}")
+
+    # encode plain's length
+    msg_length = len(encoded).to_bytes(1, byteorder=sys.byteorder)
+
+    # generate the header
+    header = b"".join([msg_length]).ljust(MESSAGE_HEADER_SIZE, b"0")
+
+    # finally the full message
+    result = b"".join([header, encoded]).ljust(MESSAGE_SIZE, b"0")
+
+    if len(result) != MESSAGE_SIZE: # final check
+        raise ValueError("resulting message incorrect")
+
+    return result
+
+def deconstruct_message(encoded):
+    """
+    Given a byte string, validates as a message (length) and returns as
+    plaintext string.
+    """
+    if not isinstance(encoded, bytes):
+        raise TypeError("encoded must be of type bytes")
+    if len(encoded) != MESSAGE_SIZE:
+        raise ValueError(f"message must be len {MESSAGE_SIZE} got {len(encoded)}")
+    
+    string_in = io.BytesIO(encoded) # process data string as file
+
+    # partition in header and dump then body
+    msg_length, _, body = [ string_in.read(x) for x in (1, 7, -1) ]
+    
+    msg_length = int.from_bytes(msg_length, byteorder=sys.byteorder) # header to int
+
+    # drop padding
+    encoded = body[:msg_length]
+
+    try:
+        plain = encoded.decode("ascii")
+    except UnicodeDecodeError:
+        raise ValueError("could not decode ascii")
+
+    if len(encoded) > (MESSAGE_SIZE - MESSAGE_HEADER_SIZE):
+        raise ValueError(f"plain must be maximum {MESSAGE_SIZE - MESSAGE_HEADER_SIZE} chars got {len(encoded)}")
+
+    return plain
+
+        
 
 def export_payload(payload):
     """
@@ -33,12 +99,13 @@ def import_payload(data):
     Given bytes data, generates a Payload instance, validating the size.
     Note all fields in payload must be bytes.
     """
+
     if not isinstance(data, bytes):
         raise TypeError(f"data must be bytes")
     if len(data) != (ADDRESS_SIZE + ADDRESS_SIZE + MESSAGE_SIZE):
         raise ValueError(f"data is incorrect size: \
             expected sum(addr:{ADDRESS_SIZE}, addr:{ADDRESS_SIZE}, msg:{MESSAGE_SIZE}) got {len(data)}")
- 
+
     string_in = io.BytesIO(data) # process data string as file
 
     collect, drop, message = \

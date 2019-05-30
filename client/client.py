@@ -86,18 +86,24 @@ def message_loop():
     curr_round = int(requests.get(url).text)
 
     while True:
-        message = input(f"ID:{self_id} Round:{curr_round} Message $> ")
+        message = None
+        while not message: # prompt until valid message
+            clear_send = input(f"ID:{self_id} Round:{curr_round} Message $> ")
+            try:
+                message = pl.construct_message(clear_send)
+            except (TypeError, ValueError, UnicodeEncodeError) as e:
+                message = None
+                print("Message invalid:", e)
         
         packet = Packet()
 
-        send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round)
-        recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round)
+        send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round) # drop
+        recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round) # collect
  
         # conversant
-        payload = pl.Payload(send_addr, recv_addr, message.ljust(512).encode())
+        payload = pl.Payload(send_addr, recv_addr, message)
             
         packet.payload = pl.export_payload(payload)
-
 
         with open("server_keys.json") as f:
             keys = [k.encode() for k in json.loads(f.read())]
@@ -118,14 +124,20 @@ def message_loop():
 
         packet.client_prep_down(response.content)
 
-        print(f"[{time.strftime('%a %H:%M:%S')}] {packet.send_out().decode().strip()}")
+        try:
+            message_recieved = pl.deconstruct_message(packet.send_out())
+        except (TypeError, ValueError, UnicodeDecodeError) as e:
+            message_recieved = f"RECEIVED INVALID: {e}"
+
+        print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved)
 
         curr_round += 1
     
 def deaddrop_address(shared, sender_id, recipient_id, round):
     """
     Generate the deaddrops for this round.
-    TODO: Make better
+    TODO: Make better -- actually hashing using shared etc
+        Use pl.ADDRESS_SIZE for address sizing
     """
     start = sender_id + recipient_id 
 

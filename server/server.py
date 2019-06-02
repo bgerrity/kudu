@@ -36,7 +36,7 @@ class Server:
         # TODO: refactor out
         self._bundles = None # representation of each servers internal state
 
-    def _get_privates(self):
+    def get_public_keys(self):
         return [ec.export_rsa_public(k).decode() for k in self._keys]
 
     def reset(self):
@@ -140,10 +140,6 @@ class Server:
             self.reset()
 
         return result
-
-    # def get_public_key(self):
-    #     """Returns this server's public RSA key."""
-    #     return ec.export_rsa_public(self._rsa_key)
 
 class Packet:
     def __init__(self):

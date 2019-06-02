@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # publish keys to dispatch for use by clients
 
-    key_data = json.dumps(db._get_privates())
+    key_data = json.dumps(db.get_public_keys())
     url = f"http://localhost:{dispatch_port}/publish_server_keys"
     response = requests.post(url, data=key_data)
     if response.status_code != HTTPStatus.OK:

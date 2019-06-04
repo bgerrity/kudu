@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 # lib/payload.py
 
-import io, sys
+import io, sys, os
 from collections import namedtuple
 
 # a standardized format for the 3-tuple used to interact with Vuvuzela servers and clients
@@ -38,13 +38,12 @@ def construct_message(plain):
     msg_length = len(encoded).to_bytes(1, byteorder=sys.byteorder)
 
     # generate the header
-    header = b"".join([msg_length]).ljust(MESSAGE_HEADER_SIZE, b"0")
+    header_useful = b"".join([msg_length]) # the used parts
+    # append random and take the appropriate length
+    header = b"".join([header_useful, os.urandom(MESSAGE_HEADER_SIZE)])[:MESSAGE_HEADER_SIZE]
 
-    # finally the full message
-    result = b"".join([header, encoded]).ljust(MESSAGE_SIZE, b"0")
-
-    if len(result) != MESSAGE_SIZE: # final check
-        raise ValueError("resulting message incorrect")
+    # finally the full message -- take the correct length
+    result = b"".join([header, encoded, os.urandom(MESSAGE_SIZE)])[:MESSAGE_SIZE]
 
     return result
 

@@ -11,8 +11,12 @@ ADDRESS_SIZE = 256 # size of shared secret used by
 MESSAGE_SIZE = 256 # paper spec
 
 # initial bytes in message body to store information
-# [0]: message_text_lenght; [1-7]: unallocated
+# [0]: message_text_length
+# [1]: noise_flag
+# [2-7]: unallocated
 MESSAGE_HEADER_SIZE = 8
+MTL = 0 # index for message_text_length
+NF = 1 # index for noise flag
 
 def construct_message(plain):
     """

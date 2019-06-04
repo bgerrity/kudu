@@ -50,7 +50,7 @@ def setup():
     if response.status_code != HTTPStatus.OK:
         print(response, response.text, file=sys.stderr)
         exit("unable to register with dispatch")
-    
+
     dh_public = ec.export_dh_public(key_dh)
     url = f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}"
     response = requests.post(url, data=dh_public)
@@ -78,6 +78,7 @@ def setup():
         response = requests.get(url)
 
     partner_dh_key = response.content
+    global shared_secret
     shared_secret = ec.generate_dh_shared_secret(key_dh, partner_dh_key) # store shared
 
     response = requests.get(url)
@@ -86,6 +87,9 @@ def setup():
         time.sleep(2)
         print(f"Waiting for availability of partner_id:{partner_id} rsa key.")
         response = requests.get(url)
+
+    global partner_rsa_key
+    partner_rsa_key = response.content
 
     print(f"Collected partner:{partner_id} keys.")
 
@@ -99,19 +103,19 @@ def message_loop():
         while not message: # prompt until valid message
             clear_send = input(f"ID:{self_id} Round:{curr_round} Message $> ")
             try:
-                message = pl.construct_message(clear_send)
+                message = pl.construct_message(clear_send) if clear_send else pl.construct_noise()
             except (TypeError, ValueError, UnicodeEncodeError) as e:
                 message = None
                 print("Message invalid:", e)
-        
+
         packet = Packet()
 
         send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round) # drop
         recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round) # collect
- 
+
         # conversant
         payload = pl.Payload(send_addr, recv_addr, message)
-            
+
         packet.payload = pl.export_payload(payload)
 
         packet.client_prep_up(server_keys)
@@ -131,21 +135,24 @@ def message_loop():
         packet.client_prep_down(response.content)
 
         try:
-            message_recieved = pl.deconstruct_message(packet.send_out())
+            noise, message_recieved = pl.deconstruct_message(packet.send_out())
         except (TypeError, ValueError, UnicodeDecodeError) as e:
-            message_recieved = f"RECEIVED INVALID: {e}"
-
-        print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved)
+            print(f"[{time.strftime('%a %H:%M:%S')}]", f"{{Error Message Invalid: {e}}}")
+        else:
+            if noise:
+                print(f"[{time.strftime('%a %H:%M:%S')}]", "{No Message}")
+            else:
+                print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved, f"{{{len(message_recieved)}}}")
 
         curr_round += 1
-    
+
 def deaddrop_address(shared, sender_id, recipient_id, round):
     """
     Generate the deaddrops for this round.
     TODO: Make better -- actually hashing using shared etc
         Use pl.ADDRESS_SIZE for address sizing
     """
-    start = sender_id + recipient_id 
+    start = sender_id + recipient_id
 
     return start.ljust(256).encode()
 

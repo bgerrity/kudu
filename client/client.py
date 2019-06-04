@@ -81,8 +81,8 @@ def setup():
     global shared_secret
     shared_secret = ec.generate_dh_shared_secret(key_dh, partner_dh_key) # store shared
 
-    response = requests.get(url)
     url = f"http://localhost:{dispatch_port}/retrieve_rsa_key/{partner_id}"
+    response = requests.get(url)
     while response.status_code != HTTPStatus.OK:
         time.sleep(2)
         print(f"Waiting for availability of partner_id:{partner_id} rsa key.")

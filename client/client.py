@@ -103,9 +103,11 @@ def message_loop():
         while not message: # prompt until valid message
             clear_send = input(f"ID:{self_id} Round:{curr_round} Message $> ")
             try:
-                message = pl.construct_message(clear_send) if clear_send else pl.construct_noise()
+                if clear_send:
+                    message = pl.construct_message(clear_send, partner_rsa_key)
+                else:
+                    message = pl.construct_noise(partner_rsa_key)
             except (TypeError, ValueError, UnicodeEncodeError) as e:
-                message = None
                 print("Message invalid:", e)
 
         packet = Packet()
@@ -134,8 +136,10 @@ def message_loop():
 
         packet.client_prep_down(response.content)
 
+
         try:
-            noise, message_recieved = pl.deconstruct_message(packet.send_out())
+            noise, message_recieved = pl.deconstruct_message(packet.send_out(), ec.export_rsa_private(key_rsa))
+
         except (TypeError, ValueError, UnicodeDecodeError) as e:
             print(f"[{time.strftime('%a %H:%M:%S')}]", f"{{Error Message Invalid: {e}}}")
         else:

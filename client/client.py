@@ -124,14 +124,19 @@ def message_loop():
 
         # send out message
         url = f"http://localhost:{server_port}/submission/{self_id}"
-        requests.post(url, data=packet.send_out())
+        response = requests.post(url, data=packet.send_out())
+        while response.status_code != HTTPStatus.ACCEPTED:
+            time.sleep(4)
+            print("waiting for server: send")
+            response = requests.post(url, data=packet.send_out())
+
 
         # wait on response
         url = f"http://localhost:{server_port}/deaddrop/{self_id}"
         response = requests.get(url)
         while response.status_code != HTTPStatus.OK:
             time.sleep(4)
-            print("waiting for server")
+            print("waiting for server: return")
             response = requests.get(url)
 
         packet.client_prep_down(response.content)
@@ -156,9 +161,8 @@ def deaddrop_address(shared, sender_id, recipient_id, round):
     TODO: Make better -- actually hashing using shared etc
         Use pl.ADDRESS_SIZE for address sizing
     """
-    start = sender_id + recipient_id
 
-    return start.ljust(256).encode()
+    return f"{sender_id}-{recipient_id}-{round}".ljust(256).encode()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Launch a client.')

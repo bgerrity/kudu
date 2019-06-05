@@ -88,4 +88,4 @@ if __name__ == '__main__':
         print(response, response.text)
         exit("server unable to publish keys to dispatch")
 
-    app.run(debug=True, port=port)
+    app.run(debug=True, port=port, use_reloader=False)

@@ -133,5 +133,5 @@ if __name__ == '__main__':
     port = args.dispatch_port
     server_port = args.server_port
 
-    app.run(debug=True, port=port)
+    app.run(debug=True, port=port, use_reloader=False)
 

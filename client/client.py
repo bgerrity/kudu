@@ -50,7 +50,7 @@ def setup():
     if response.status_code != HTTPStatus.OK:
         print(response, response.text, file=sys.stderr)
         exit("unable to register with dispatch")
-    
+
     dh_public = ec.export_dh_public(key_dh)
     url = f"http://localhost:{dispatch_port}/publish_dh_key/{self_id}"
     response = requests.post(url, data=dh_public)
@@ -78,14 +78,18 @@ def setup():
         response = requests.get(url)
 
     partner_dh_key = response.content
+    global shared_secret
     shared_secret = ec.generate_dh_shared_secret(key_dh, partner_dh_key) # store shared
 
-    response = requests.get(url)
     url = f"http://localhost:{dispatch_port}/retrieve_rsa_key/{partner_id}"
+    response = requests.get(url)
     while response.status_code != HTTPStatus.OK:
         time.sleep(2)
         print(f"Waiting for availability of partner_id:{partner_id} rsa key.")
         response = requests.get(url)
+
+    global partner_rsa_key
+    partner_rsa_key = response.content
 
     print(f"Collected partner:{partner_id} keys.")
 
@@ -99,55 +103,66 @@ def message_loop():
         while not message: # prompt until valid message
             clear_send = input(f"ID:{self_id} Round:{curr_round} Message $> ")
             try:
-                message = pl.construct_message(clear_send)
+                if clear_send:
+                    message = pl.construct_message(clear_send, partner_rsa_key)
+                else:
+                    message = pl.construct_noise(partner_rsa_key)
             except (TypeError, ValueError, UnicodeEncodeError) as e:
-                message = None
                 print("Message invalid:", e)
-        
+
         packet = Packet()
 
         send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round) # drop
         recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round) # collect
- 
+
         # conversant
         payload = pl.Payload(send_addr, recv_addr, message)
-            
+
         packet.payload = pl.export_payload(payload)
 
         packet.client_prep_up(server_keys)
 
         # send out message
         url = f"http://localhost:{server_port}/submission/{self_id}"
-        requests.post(url, data=packet.send_out())
+        response = requests.post(url, data=packet.send_out())
+        while response.status_code != HTTPStatus.ACCEPTED:
+            time.sleep(4)
+            print("waiting for server: send")
+            response = requests.post(url, data=packet.send_out())
+
 
         # wait on response
         url = f"http://localhost:{server_port}/deaddrop/{self_id}"
         response = requests.get(url)
         while response.status_code != HTTPStatus.OK:
             time.sleep(4)
-            print("waiting for server")
+            print("waiting for server: return")
             response = requests.get(url)
 
         packet.client_prep_down(response.content)
 
-        try:
-            message_recieved = pl.deconstruct_message(packet.send_out())
-        except (TypeError, ValueError, UnicodeDecodeError) as e:
-            message_recieved = f"RECEIVED INVALID: {e}"
 
-        print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved)
+        try:
+            noise, message_recieved = pl.deconstruct_message(packet.send_out(), ec.export_rsa_private(key_rsa))
+
+        except (TypeError, ValueError, UnicodeDecodeError) as e:
+            print(f"[{time.strftime('%a %H:%M:%S')}]", f"{{Error Message Invalid: {e}}}")
+        else:
+            if noise:
+                print(f"[{time.strftime('%a %H:%M:%S')}]", "{No Message}")
+            else:
+                print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved, f"{{{len(message_recieved)}}}")
 
         curr_round += 1
-    
+
 def deaddrop_address(shared, sender_id, recipient_id, round):
     """
     Generate the deaddrops for this round.
     TODO: Make better -- actually hashing using shared etc
         Use pl.ADDRESS_SIZE for address sizing
     """
-    start = sender_id + recipient_id 
 
-    return start.ljust(256).encode()
+    return f"{sender_id}-{recipient_id}-{round}".ljust(256).encode()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Launch a client.')

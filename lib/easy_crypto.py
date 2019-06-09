@@ -1,4 +1,3 @@
-#! /usr/bin/env python3
 # lib/easy_crypto.py
 
 import sys, io
@@ -158,42 +157,3 @@ def generate_dh_shared_secret(client_private_key, peer_public_key):
     shared_key = client_private_key.update(int.from_bytes(peer_public_key, byteorder=sys.byteorder))
 
     return shared_key.to_bytes(256, byteorder=sys.byteorder)
-
-# TESTING SCRIPT
-if __name__ == '__main__':
-    rsa_plain = "life is like a box of chocolates".encode("utf-8")
-
-    rsa_key = generate_rsa()
-
-    p_export = export_rsa_public(rsa_key)
-    s_export = export_rsa_private(rsa_key)
-
-    rsa_encrypted = encrypt_rsa(rsa_plain, p_export)
-    rsa_decrypted = decrypt_rsa(rsa_encrypted, s_export)
-
-    print(rsa_decrypted.decode("utf-8"))
-
-
-    aes_plain = "full of surprises".encode("utf-8")
-
-    aes_key = generate_aes()
-
-    aes_encrypted = encrypt_aes(aes_plain, aes_key)
-    aes_decrypted = decrypt_aes(aes_encrypted, aes_key)
-
-    print(aes_decrypted.decode("utf-8"))
-
-    # Diffie Hellman testing
-    a_private = generate_dh()
-    b_private = generate_dh()
-
-    a_public = export_dh_public(a_private)
-    b_public = export_dh_public(b_private)
-
-    a_shared = generate_dh_shared_secret(a_private, b_public)
-    b_shared = generate_dh_shared_secret(b_private, a_public)
-
-    if a_shared == b_shared:
-        print("DH derived same number")
-    else:
-        print("DH failed")

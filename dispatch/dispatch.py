@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
-# server/dispatch_server.py
+# dispatch/dispatch.py
 
-# TODO: moduel docstring
+# TODO: module docstring
 
 from flask import Flask, Response, request, redirect, jsonify
 import sys, time, argparse

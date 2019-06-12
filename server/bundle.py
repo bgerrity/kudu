@@ -2,7 +2,7 @@
 
 import os, sys, random
 
-sys.path.append(os.path.abspath('../Kudu'))
+sys.path.append(os.path.abspath('../kudu'))
 
 from packet import Packet
 

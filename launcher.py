@@ -2,7 +2,7 @@
 
 import subprocess, time, os, sys
 
-sys.path.append(os.path.abspath('../Kudu'))
+sys.path.append(os.path.abspath('../kudu'))
 
 
 def spin_up_dispatch_server():

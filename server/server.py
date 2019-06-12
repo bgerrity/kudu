@@ -4,7 +4,7 @@ import os, sys
 from enum import Enum
 from collections import OrderedDict
 
-sys.path.append(os.path.abspath('../Kudu'))
+sys.path.append(os.path.abspath('../kudu'))
 
 import lib.easy_crypto as ec
 import lib.payload as pl

@@ -8,7 +8,7 @@ import requests
 
 import os, sys, time, json, argparse
 
-sys.path.append(os.path.abspath('../Kudu'))
+sys.path.append(os.path.abspath('../kudu'))
 
 import lib.easy_crypto as ec
 import lib.payload as pl

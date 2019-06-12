@@ -4,7 +4,7 @@
 import io, sys, os
 from collections import namedtuple
 
-sys.path.append(os.path.abspath('../Kudu'))
+sys.path.append(os.path.abspath('../kudu'))
 
 import lib.easy_crypto as ec
 

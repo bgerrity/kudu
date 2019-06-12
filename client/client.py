@@ -112,8 +112,8 @@ def message_loop():
 
         packet = Packet()
 
-        send_addr = deaddrop_address(shared_secret, self_id, partner_id, curr_round) # drop
-        recv_addr = deaddrop_address(shared_secret, partner_id, self_id, curr_round) # collect
+        send_addr = ec.generate_deaddrop_id(shared_secret, self_id, partner_id, curr_round) # drop
+        recv_addr = ec.generate_deaddrop_id(shared_secret, partner_id, self_id, curr_round) # collect
 
         # conversant
         payload = pl.Payload(send_addr, recv_addr, message)
@@ -154,15 +154,6 @@ def message_loop():
                 print(f"[{time.strftime('%a %H:%M:%S')}]", message_recieved, f"{{{len(message_recieved)}}}")
 
         curr_round += 1
-
-def deaddrop_address(shared, sender_id, recipient_id, round):
-    """
-    Generate the deaddrops for this round.
-    TODO: Make better -- actually hashing using shared etc
-        Use pl.ADDRESS_SIZE for address sizing
-    """
-
-    return f"{sender_id}-{recipient_id}-{round}".ljust(256).encode()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Launch a client.')

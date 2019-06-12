@@ -6,8 +6,8 @@ sys.path.append(os.path.abspath('../kudu'))
 
 
 def spin_up_dispatch_server():
-    subprocess.call(["gnome-terminal", "--", "dispatch/dispatch_server.py"])
-    time.sleep(2)
+    subprocess.call(["gnome-terminal", "--", "dispatch/dispatch.py", "2"])
+    time.sleep(1)
 
 def spin_up_clients():
     subprocess.call(["gnome-terminal", "--", "client/client.py", "1", "2"])
@@ -15,8 +15,9 @@ def spin_up_clients():
     print("started clients")
 
 def spin_up_vuvuzela_server():
-    subprocess.call(["gnome-terminal", "--", "server/server.py"])
+    subprocess.call(["gnome-terminal", "--", "server/app.py", "2"])
+    time.sleep(5)
 
 spin_up_dispatch_server()
+spin_up_vuvuzela_server()
 spin_up_clients()
-#spin_up_vuvuzela_server()

@@ -159,9 +159,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Launch a client.')
     parser.add_argument("self_id", help="the id for this client")
     parser.add_argument("partner_id", help="the id for its conversation partner")
-    parser.add_argument("-d", "--dispatch-port", nargs=1, type=int, default=5000,
+    parser.add_argument("-d", "--dispatch-port", type=int, default=5000,
         help="the port for the dispatch server")
-    parser.add_argument("-s", "--server-port", nargs=1, type=int, default=5001,
+    parser.add_argument("-s", "--server-port", type=int, default=5001,
         help="the port for the Vuvuzela server")
 
     args = parser.parse_args()

@@ -54,6 +54,10 @@ Each clients should prompt for a message to send to its partner.
 
 See the help text of each executable for additional information.
 
+#### Linux
+
+The `./launcher.py` script allows a similar demonstration to be easily be spun up.
+
 ## Implementation Details
 
 A note on terminology:

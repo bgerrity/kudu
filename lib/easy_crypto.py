@@ -11,6 +11,7 @@ elif platform == "darwin":
     from Crypto.PublicKey import RSA
     from Crypto.Random import get_random_bytes
     from Crypto.Cipher import AES, PKCS1_OAEP
+    from Crypto.Hash import SHA256
 else: # e.g. platform == "win32":
     raise NotImplementedError(f"no support for sys.platform:{platform}")
 
@@ -157,3 +158,16 @@ def generate_dh_shared_secret(client_private_key, peer_public_key):
     shared_key = client_private_key.update(int.from_bytes(peer_public_key, byteorder=sys.byteorder))
 
     return shared_key.to_bytes(256, byteorder=sys.byteorder)
+
+def generate_deaddrop_id(sender, receiver, round, secret):
+    """
+    Given sender and receiver ids, round and shared secret,
+    generates a deaddrop address
+    """
+    hash = SHA256.new()
+    hash.update(str(sender).encode())
+    hash.update(str(receiver).encode())
+    hash.update(str(secret).encode())
+    hash.update(str(round).encode())
+
+    return hash.digest().ljust(256)

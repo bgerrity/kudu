@@ -26,7 +26,7 @@ def hello():
     return "Hello from the server!"
 
 # stores uploaded packet
-@app.route('/submission/<int:id>', methods=['POST'])
+@app.route('/submission/<string:id>', methods=['POST'])
 def post_submission(id):
     with server_lock:
         if db.mode == db.Modes.RECEIVING:
@@ -42,7 +42,7 @@ def get_current_round():
         round = db.current_round
     return f"{round}", HTTPStatus.OK
 
-@app.route('/deaddrop/<int:id>', methods=['GET'])
+@app.route('/deaddrop/<string:id>', methods=['GET'])
 def get_response(id):
     with server_lock:
         if db.mode != db.Modes.DISTRIBUTING:

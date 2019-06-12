@@ -25,7 +25,7 @@ registered_ids = set()
 public_keys_rsa = {}
 public_keys_dh = {}
 
-@app.route("/register_id/<int:id>", methods=['POST'])
+@app.route("/register_id/<string:id>", methods=['POST'])
 def register_id(id):
     with server_lock:
         if len(registered_ids) >= expected_clients:
@@ -42,7 +42,7 @@ def registered():
     with server_lock:
         return jsonify(list(registered_ids))
 
-@app.route("/publish_dh_key/<int:id>", methods=['POST'])
+@app.route("/publish_dh_key/<string:id>", methods=['POST'])
 def publish_dh_key(id):
     with server_lock:
         if id not in registered_ids:
@@ -55,7 +55,7 @@ def publish_dh_key(id):
 
     return f"received DH key from id:{id}"
 
-@app.route("/retrieve_dh_key/<int:id>", methods=['GET'])
+@app.route("/retrieve_dh_key/<string:id>", methods=['GET'])
 def retrieve_dh_key(id):
     with server_lock:
         if id not in registered_ids:
@@ -67,7 +67,7 @@ def retrieve_dh_key(id):
 
     return key
 
-@app.route("/publish_rsa_key/<int:id>", methods=['POST'])
+@app.route("/publish_rsa_key/<string:id>", methods=['POST'])
 def publish_rsa_key(id):
     with server_lock:
         if id not in registered_ids:
@@ -80,7 +80,7 @@ def publish_rsa_key(id):
 
     return f"received RSA key from id:{id}"
 
-@app.route("/retrieve_rsa_key/<int:id>", methods=['GET'])
+@app.route("/retrieve_rsa_key/<string:id>", methods=['GET'])
 def retrieve_rsa_key(id):
     with server_lock:
         if id not in registered_ids:
